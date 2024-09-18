@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "topic-vector-search"
+version = "0.1.0"
+description = "Materials for talk on Thinking of Topic Modeling as Search"
+authors = ["Kas Stohr <kas@99antennas.com>"]
+readme = "README.md"
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+pydantic = "^2.9.1"
+opensearch-py = "^2.7.1"
+openai = "^1.45.0"
+sentence-transformers = "^3.1.0"
+bertopic = "^0.16.3"
+emoji = "^2.12.1"
+gensim = "^4.3.3"
+
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.6.5"
+jupyterlab = "^4.2.5"
+jupyter-contrib-nbextensions = "^0.7.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
