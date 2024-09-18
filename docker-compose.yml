@@ -1,0 +1,15 @@
+services:
+# sample-docker-compose-file-for-development
+# https://opensearch.org/docs/latest/install-and-configure/install-opensearch/docker/
+  opensearch:
+    image: opensearchproject/opensearch:2.13.0
+    container_name: opensearch-1
+    environment:
+      - discovery.type=single-node # Single node
+      - "DISABLE_INSTALL_DEMO_CONFIG=true" # Prevent install of demo certs/security config
+      - "DISABLE_SECURITY_PLUGIN=true" # Disable security plugin
+    ports:
+      - 9200:9200
+      - 9300:9300 # Performance analyzer
+    logging:
+      driver: "none"
