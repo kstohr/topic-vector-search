@@ -25,14 +25,30 @@ docker compose up
  ```
 
 # Comments
-- This demonstration depends on OpenSearch, which is a forked version of ElasticSearch,
-  and is now supported by AWS's managed service rather than ElasticSearch.
+- This demonstration depends on OpenSearch, which is a forked version of
+  ElasticSearch, and is now supported by AWS's managed service rather than
+  ElasticSearch.
   However, this functionality also exists on
   [ElasticSearch](https://www.elastic.co/guide/en/elasticsearch/reference/current/dense-vector.html).
   The code to run the search is slightly different and you will need to adapt
   this example.
 
-  # Reference
+  # References and Credits
   Open Search Vector Search:
   [https://opensearch.org/docs/latest/search-plugins/vector-search/](https://opensearch.org/docs/latest/search-plugins/vector-search/)
   BERTopic:
+
+  Text Embeddings:
+  [https://stackoverflow.blog/2023/11/09/an-intuitive-introduction-to-text-embeddings/](https://stackoverflow.blog/2023/11/09/an-intuitive-introduction-to-text-embeddings/)
+
+  BERTopic - Package for topic modeling by Maarten Grootendorst
+  [https://github.com/MaartenGr/BERTopic](https://github.com/MaartenGr/BERTopic)
+
+  Comparing Clustering Algorithms (HDBSCAN)
+  [https://hdbscan.readthedocs.io/en/latest/comparing_clustering_algorithms.html](https://github.com/MaartenGr/BERTopic)
+
+  c-TF-IDF
+  [https://www.maartengrootendorst.com/blog/ctfidf/](https://www.maartengrootendorst.com/blog/ctfidf/)
+
+  Vector Search with Text Search
+ [https://towardsdatascience.com/text-search-vs-vector-search-better-together-3bd48eb6132a](https://www.maartengrootendorst.com/blog/ctfidf/)
