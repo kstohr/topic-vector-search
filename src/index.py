@@ -32,3 +32,13 @@ def create_index(opensearch_client):
         print(f"Index '{INDEX_NAME}' created successfully.")
     else:
         print(f"Index '{INDEX_NAME}' already exists.")
+
+
+# Function to teardown the OpenSearch index 
+def delete_index(opensearch_client): 
+    if opensearch_client.indices.exists(INDEX_NAME):
+        opensearch_client.indices.delete(index=INDEX_NAME)
+        print(f"Index '{INDEX_NAME}' deleted successfully.")
+    else:
+        print(f"Index '{INDEX_NAME}' does not exists.")
+            
