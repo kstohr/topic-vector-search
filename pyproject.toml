@@ -15,6 +15,7 @@ sentence-transformers = "^3.1.0"
 bertopic = "^0.16.3"
 emoji = "^2.12.1"
 gensim = "^4.3.3"
+python-dotenv = "^1.0.1"
 
 
 [tool.poetry.group.dev.dependencies]

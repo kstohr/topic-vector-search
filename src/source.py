@@ -75,6 +75,19 @@ def store_posts_in_opensearch(
     if failed:
         logger.error(f"Failed to store {failed} posts in OpenSearch.")
 
+def delete_all_documents(opensearch_client: OpenSearch, index_name='post_docs', host='localhost', port=9200):
+    # Delete all documents using Delete by Query with match_all
+    response = opensearch_client.delete_by_query(
+        index=index_name,
+        body={
+            "query": {
+                "match_all": {}  # Matches all documents
+            }
+        }
+    )
+
+    print(f"Deleted {response['deleted']} documents from index '{index_name}'.")
+
 
 # Main function to load, process, and store posts
 async def main():
