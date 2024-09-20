@@ -48,7 +48,8 @@ Open Search Vector Search:
 [https://opensearch.org/docs/latest/search-plugins/vector-search/](https://opensearch.org/docs/latest/search-plugins/vector-search/)
 
 Text Embeddings:
-[https://stackoverflow.blog/2023/11/09/an-intuitive-introduction-to-text-embeddings/](https://stackoverflow.blog/2023/11/09/an-intuitive-introduction-to-text-embeddings/)
+[https://stackoverflow.blog/2023/11/09/an-intuitive-introduction-to-text-embeddings/]  
+(https://stackoverflow.blog/2023/11/09/an-intuitive-introduction-to-text-embeddings/)
 
 BERTopic - Package for topic modeling by Maarten Grootendorst  
 [https://github.com/MaartenGr/BERTopic](https://github.com/MaartenGr/BERTopic)
@@ -61,6 +62,5 @@ c-TF-IDF
 
 Vector Search with Text Search  
 [https://towardsdatascience.com/text-search-vs-vector-search-better-together-3bd48eb6132a](https://towardsdatascience.com/text-search-vs-vector-search-better-together-3bd48eb6132a)  
-
 [https://machine-mind-ml.medium.com/enhancing-llm-performance-with-vector-search-and-vector-databases-1f20eb1cc650](https://machine-mind-ml.medium.com/enhancing-llm-performance-with-vector-search-and-vector-databases-1f20eb1cc650)
 
