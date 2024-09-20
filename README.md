@@ -20,7 +20,7 @@ This will install a local version of the Open Search database.
 ```
 docker compose up
 ```
-2. Install Poetry
+2. Install and launch Poetry environment
  ```
  pipx install poetry
  poetry init
@@ -28,18 +28,20 @@ docker compose up
  ```
 
 # Comments
-- This demonstration depends on OpenSearch, which is a forked version of
-  ElasticSearch, and is now supported by AWS's managed service rather than
-  ElasticSearch.
-  However, this functionality also exists on
-  [ElasticSearch](https://www.elastic.co/guide/en/elasticsearch/reference/current/dense-vector.html).
-  The code to run the search is slightly different and you will need to adapt
-  this example.
+This demonstration depends on OpenSearch, which is a forked version of
+ElasticSearch, and is now supported by AWS's managed service rather than
+ElasticSearch. However, this functionality also exists on
+[ElasticSearch](https://www.elastic.co/guide/en/elasticsearch/reference/current/dense-vector.html).
+The code to run the search is slightly different and you will need to adapt this example.
 
   # References and Credits
+  Thanks go to Maarten Grootendorst for his work and excellent documentation in
+  [BERTopic](https://github.com/MaartenGr/BERTopic) as well as colleagues at
+  Unified and coding partner, [Ray 'Urgent'
+  McLendon](https://www.linkedin.com/in/raymclendon/) for his interest and guidance.
+
   Open Search Vector Search:
   [https://opensearch.org/docs/latest/search-plugins/vector-search/](https://opensearch.org/docs/latest/search-plugins/vector-search/)
-
 
   Text Embeddings:
   [https://stackoverflow.blog/2023/11/09/an-intuitive-introduction-to-text-embeddings/](https://stackoverflow.blog/2023/11/09/an-intuitive-introduction-to-text-embeddings/)
@@ -55,3 +57,6 @@ docker compose up
 
   Vector Search with Text Search
  [https://towardsdatascience.com/text-search-vs-vector-search-better-together-3bd48eb6132a](https://www.maartengrootendorst.com/blog/ctfidf/)
+
+  [https://machine-mind-ml.medium.com/](enhancing-llm-performance-with-vector-search-and-vector-databases-1f20eb1cc650)
+
