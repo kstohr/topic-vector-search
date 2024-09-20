@@ -44,23 +44,23 @@ Thanks go to Maarten Grootendorst for his work and excellent documentation in
 [BERTopic](https://github.com/MaartenGr/BERTopic) as well as colleagues at
 Unified and coding partner, [Ray 'Urgent'McLendon](https://www.linkedin.com/in/raymclendon/) for his interest and input.
 
-Open Search Vector Search:
+Open Search Vector Search:  
 [https://opensearch.org/docs/latest/search-plugins/vector-search/](https://opensearch.org/docs/latest/search-plugins/vector-search/)
 
 Text Embeddings:
 [https://stackoverflow.blog/2023/11/09/an-intuitive-introduction-to-text-embeddings/](https://stackoverflow.blog/2023/11/09/an-intuitive-introduction-to-text-embeddings/)
 
-BERTopic - Package for topic modeling by Maarten Grootendorst
+BERTopic - Package for topic modeling by Maarten Grootendorst  
 [https://github.com/MaartenGr/BERTopic](https://github.com/MaartenGr/BERTopic)
 
-Comparing Clustering Algorithms (HDBSCAN)
+Comparing Clustering Algorithms (HDBSCAN)  
 [https://hdbscan.readthedocs.io/en/latest/comparing_clustering_algorithms.html](https://hdbscan.readthedocs.io/en/latest/comparing_clustering_algorithms.html)
 
-c-TF-IDF
+c-TF-IDF  
 [https://www.maartengrootendorst.com/blog/ctfidf/](https://www.maartengrootendorst.com/blog/ctfidf/)
 
-Vector Search with Text Search
-[https://towardsdatascience.com/text-search-vs-vector-search-better-together-3bd48eb6132a](https://towardsdatascience.com/text-search-vs-vector-search-better-together-3bd48eb6132a)
+Vector Search with Text Search  
+[https://towardsdatascience.com/text-search-vs-vector-search-better-together-3bd48eb6132a](https://towardsdatascience.com/text-search-vs-vector-search-better-together-3bd48eb6132a)  
 
 [https://machine-mind-ml.medium.com/enhancing-llm-performance-with-vector-search-and-vector-databases-1f20eb1cc650](https://machine-mind-ml.medium.com/enhancing-llm-performance-with-vector-search-and-vector-databases-1f20eb1cc650)
 
