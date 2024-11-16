@@ -3,7 +3,11 @@ Use vector search to search for documents related to topics derived from a topic
 model.
 
 # Presentation
-[Thinking of Topic Modeling as Search](https://docs.google.com/presentation/d/1UfaDLzG9WvTeP8I64za-ycwnst8bXMzx/edit?usp=sharing&ouid=105992325138979778362&rtpof=true&sd=true)
+
+Typically when you think about using a topic model in production you encounter two hurdles: First, topics change continually, and document tags become stale as soon as they are created. Second, while unsupervised topic models do a good job of clustering topics, creating robust, human-interpretable labels is challenging. Framing topic modeling as a search problem, helps overcome these challenges and makes it easier to use supervised or unsupervised topic models in real-time applications.
+
+[PyBay 2024 - Thinking of Topic Modeling as Search (video of talk)](https://www.youtube.com/watch?v=vymhlfxAd4Y)
+[Thinking of Topic Modeling as Search (slide deck)](https://docs.google.com/presentation/d/1UfaDLzG9WvTeP8I64za-ycwnst8bXMzx/edit?usp=sharing&ouid=105992325138979778362&rtpof=true&sd=true)
 
 
 # Requirements
