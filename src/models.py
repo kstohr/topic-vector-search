@@ -15,6 +15,7 @@ class PostDocument(BaseModel):
     created_at: datetime
     modified_at: datetime
     post_text: str
+    likes: int = 0
     doc_embedding: Optional[List[float]] = Field(default_factory=list)
 
     @field_validator("created_at", "modified_at", mode="before")

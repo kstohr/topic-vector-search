@@ -94,6 +94,48 @@ class Searcher:
         return self.search_similar_documents(embedding, top_k)
 
 
+class InMemorySearcher:
+    """Drop-in replacement for Searcher that works without OpenSearch.
+    Uses cosine similarity over a numpy matrix of post embeddings.
+    """
+
+    def __init__(self, posts: List[dict], embedding_model_name: str = "all-MiniLM-L6-v2"):
+        self.embedding_model = SentenceTransformer(embedding_model_name)
+        self.posts = posts
+        embeddings = np.array([p["doc_embedding"] for p in posts], dtype=np.float32)
+        norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+        self.embeddings_norm = embeddings / np.where(norms == 0, 1, norms)
+
+    def convert_keywords_to_embedding(self, keywords: List[str]) -> np.ndarray:
+        text = " ".join(keywords)
+        return self.embedding_model.encode(text, convert_to_numpy=True)
+
+    def search_similar_documents(
+        self,
+        embedding: np.ndarray,
+        top_k: int = 20,
+        filters: List[dict] = None,
+    ) -> List[dict]:
+        q = embedding / (np.linalg.norm(embedding) or 1)
+        scores = self.embeddings_norm @ q
+        top_indices = np.argsort(scores)[::-1][:top_k]
+        results = []
+        for i in top_indices:
+            result = {k: v for k, v in self.posts[i].items() if k != "doc_embedding"}
+            result["score"] = float(scores[i])
+            results.append(result)
+        return results
+
+    def search(self, input_data: Union[List[str], np.ndarray], top_k: int = 20) -> List[dict]:
+        if isinstance(input_data, list):
+            embedding = self.convert_keywords_to_embedding(input_data)
+        elif isinstance(input_data, np.ndarray):
+            embedding = input_data
+        else:
+            raise ValueError("Input must be a list of keywords or an np.ndarray embedding.")
+        return self.search_similar_documents(embedding, top_k)
+
+
 # Example usage
 if __name__ == "__main__":
     from source import main

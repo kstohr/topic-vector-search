@@ -1,28 +1,41 @@
-[tool.poetry]
+[project]
 name = "topic-vector-search"
 version = "0.1.0"
-description = "Materials for talk on Thinking of Topic Modeling as Search"
-authors = ["Kas Stohr <kas@99antennas.com>"]
+description = "Materials for PyCon 2026 tutorial: Thinking of Topic Modeling as Search"
+authors = [{ name = "Kas Stohr", email = "kas@99antennas.com" }]
 readme = "README.md"
-license = "MIT"
+license = { text = "MIT" }
+requires-python = ">=3.12"
 
-[tool.poetry.dependencies]
-python = "^3.12"
-pydantic = "^2.9.1"
-opensearch-py = "^2.7.1"
-openai = "^1.45.0"
-sentence-transformers = "^3.1.0"
-bertopic = "^0.16.3"
-emoji = "^2.12.1"
-gensim = "^4.3.3"
-python-dotenv = "^1.0.1"
+dependencies = [
+    "pydantic>=2.9.1",
+    "opensearch-py>=2.7.1",
+    "openai>=1.45.0",
+    "sentence-transformers>=3.1.0",
+    "bertopic>=0.16.3",
+    "emoji>=2.12.1",
+    "gensim>=4.3.3",
+    "python-dotenv>=1.0.1",
+    "streamlit>=1.35",
+    "numpy>=1.26",
+    "pandas>=2.0",
+]
 
-
-[tool.poetry.group.dev.dependencies]
-ruff = "^0.6.5"
-jupyterlab = "^4.2.5"
-jupyter-contrib-nbextensions = "^0.7.0"
+[dependency-groups]
+dev = [
+    "ruff>=0.6.5",
+    "jupyterlab>=4.2.5",
+]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 100

@@ -1,6 +1,39 @@
 # Thinking of Topic Modeling as Search
-Use vector search to search for documents related to topics derived from a topic
-model.
+Use vector search to search for documents related to topics derived from a topic model.
+
+**PyCon 2026 Tutorial** · 3 hours · [Slide deck](https://docs.google.com/presentation/d/1hayVZQV9psYBdM6HwAjF3uWcQu7lieLP/edit)
+
+---
+
+## Workshop Quick Start
+
+**Before the workshop:** run `notebooks/00_setup_check.ipynb` to verify your environment.
+
+### Exercises
+
+| # | File | Format | What you build |
+|---|------|--------|----------------|
+| 1 | `notebooks/01_embeddings.ipynb` | Notebook | Sentence → document → corpus embeddings |
+| 2 | `exercises/02_topic_model.py` | Python file | Topic model pipeline + localized embeddings |
+| 3 | `notebooks/03_search_evaluation.ipynb` | Notebook | Naive vs. localized embedding comparison |
+
+Solutions are in `solutions/`.
+
+### Interactive Demo (Streamlit)
+
+```bash
+uv run streamlit run app.py
+```
+
+Explore search results for each topic, toggle between naive and localized embeddings,
+and see the match-ratio metric update in real time.
+
+### No Docker? No problem.
+
+All exercises work without OpenSearch. An in-memory fallback (`InMemorySearcher` in
+`src/search.py`) is used automatically when OpenSearch is not available.
+
+---
 
 # Presentation
 
@@ -11,30 +44,33 @@ Typically when you think about using a topic model in production you encounter t
 
 
 # Requirements
-- python 3.12
-- [poetry]() (package manager)
-- [Docker]()
-- [Docker Compose](https://docs.docker.com/compose/install/)
+- Python 3.12+
+- [uv](https://docs.astral.sh/uv/) (package manager)
+- Docker + Docker Compose *(optional — in-memory fallback provided)*
 
 # Installation
-After cloning the repository and change directory to the project root:
+After cloning the repository:
 
-1. Run Docker Compose
-This will install a local version of the Open Search database.
+1. Install dependencies with uv
+```bash
+uv sync
 ```
-docker compose up
+
+2. (Optional) Start OpenSearch for full vector DB support
+```bash
+docker compose up -d
 ```
-2. Install and launch Poetry environment
- ```
- pipx install poetry
- poetry install
- poetry shell
- ```
-3. Create a .env file with OPENAI credentials (or adapt to the service of your choice)
+
+3. Create a `.env` file with OpenAI credentials *(only needed to retrain the topic model)*
 ```
-OPENAI_API_KEY="sk-some-key"
-OPENAI_ORGANIZATION="org-some-org-or-none"
-OPENAI_PROJECT="proj_some-project-or-none"
+OPENAI_API_KEY="sk-..."
+OPENAI_ORGANIZATION="org-..."
+OPENAI_PROJECT="proj_..."
+```
+
+4. Run the Streamlit demo
+```bash
+uv run streamlit run app.py
 ```
 # Comments
 This demonstration depends on OpenSearch, which is a forked version of
