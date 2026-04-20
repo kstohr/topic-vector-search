@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git push *)",
+      "WebFetch(domain:treyhunner.com)",
+      "Bash(python3 *)",
+      "Bash(poetry run python -c ' *)",
+      "Bash(pip3 show *)",
+      "Bash(git checkout *)",
+      "Bash(git add *)"
+    ]
+  }
+}
