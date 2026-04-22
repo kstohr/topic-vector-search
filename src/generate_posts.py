@@ -125,7 +125,8 @@ def random_datetime():
 def generate_posts_list(topic, keywords):
     prompt = f"""
     Generate a list of {number_of_posts} unique social media posts about {topic}.
-    Include relevant emojis and keywords such as {','.join(keywords)}. Make each
+    Include relevant emojis and keywords such as {','.join(keywords)}.
+    Make each
     post engaging and relevant to the topic. Do not repeat the content of posts.
     Posts content should be unique. Vary the length of
     posts from one sentence to 10 sentences. Posts on more serious topics should
@@ -223,6 +224,7 @@ def main():
             "created_at": random_datetime().isoformat(),
             "modified_at": random_datetime().isoformat(),
             "post_text": post_text,
+            "post_image": None,
             "txt_embedding": [],  # Embedding field left blank
         }
         posts.append(post)

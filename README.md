@@ -11,13 +11,6 @@ Use vector search to search for documents related to topics derived from a topic
 
 ### Exercises
 
-| # | File | Format | What you build |
-|---|------|--------|----------------|
-| 1 | `notebooks/01_embeddings.ipynb` | Notebook | Sentence → document → corpus embeddings |
-| 2 | `exercises/02_topic_model.py` | Python file | Topic model pipeline + localized embeddings |
-| 3 | `notebooks/03_search_evaluation.ipynb` | Notebook | Naive vs. localized embedding comparison |
-
-Solutions are in `solutions/`.
 
 ### Interactive Demo (Streamlit)
 

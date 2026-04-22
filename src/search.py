@@ -94,6 +94,30 @@ class Searcher:
         return self.search_similar_documents(embedding, top_k)
 
 
+class LexicalSearcher:
+    """LO1 placeholder: simple substring search (SQL LIKE equivalent).
+    Used when post embeddings have not yet been generated.
+    """
+
+    def __init__(self, posts: List[dict]):
+        self.posts = posts
+
+    def search_similar_documents(
+        self, query: str, top_k: int = 20, filters: List[dict] = None
+    ) -> List[dict]:
+        query_lower = query.lower()
+        results = [
+            {"score": 1.0, **{k: v for k, v in p.items() if k != "doc_embedding"}}
+            for p in self.posts
+            if query_lower in p.get("post_text", "").lower()
+        ]
+        return results[:top_k]
+
+    def search(self, input_data, top_k: int = 20) -> List[dict]:
+        query = " ".join(input_data) if isinstance(input_data, list) else str(input_data)
+        return self.search_similar_documents(query, top_k)
+
+
 class InMemorySearcher:
     """Drop-in replacement for Searcher that works without OpenSearch.
     Uses cosine similarity over a numpy matrix of post embeddings.

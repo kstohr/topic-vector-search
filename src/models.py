@@ -16,6 +16,8 @@ class PostDocument(BaseModel):
     modified_at: datetime
     post_text: str
     likes: int = 0
+    image_url: Optional[str] = None
+    image_caption: Optional[str] = None  # populated by LO5 vision exercise
     doc_embedding: Optional[List[float]] = Field(default_factory=list)
 
     @field_validator("created_at", "modified_at", mode="before")
