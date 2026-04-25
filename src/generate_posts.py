@@ -1,5 +1,5 @@
 """
-Generate posts on six (6) example topics.
+Generate posts on six (7) example topics.
 """
 
 import json
@@ -9,20 +9,17 @@ import random
 import uuid
 from datetime import datetime, timedelta
 
-import openai
-from openai.types.chat.chat_completion import ChatCompletion
+from openai import OpenAI
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-OPENAI_MODEL = "gpt-3.5-turbo"
 RANDOM_SEED = 99
 
-# Load environment variables for OpenAI API key, organization, and project
-openai.api_key = os.getenv("OPENAI_API_KEY")
-openai.organization = os.getenv("OPENAI_ORGANIZATION")
-openai.project = os.getenv("OPENAI_PROJECT")
+from src.config import OLLAMA_URL, OLLAMA_MODEL
+
+client = OpenAI(base_url=OLLAMA_URL, api_key="ollama")
 
 # Define the topics and keywords
 topics = {
@@ -51,18 +48,33 @@ topics = {
         "⭐ Top Pick",
         "playlist",
     ],
-    "Social Activism": [
-        "✊🏽 Solidarity",
-        "📢 SpeakUp",
-        "🌍 Change",
-        "🗳️ Vote",
-        "⚖️ Justice",
-        "📣 Activism",
-        "🤝 Community",
-        "🚫 NoHate",
-        "✊🏿 BlackLivesMatter",
-        "🌈 TransGender Rights",
-        "Climate Change",
+    "Space Travel and Astronauts": [
+        "🚀 Rocket",
+        "👩‍🚀 Astronaut",
+        "🌌 Cosmos",
+        "🛸 SpaceX",
+        "🌙 Artemis",
+        "🌍 ISS",
+        "NASA",
+        "🔭 JWST",
+        "Mars",
+        "Orbit",
+        "Launch",
+        "Zero gravity",
+    ],
+    "Interior Design and Home Renovation": [
+        "🛋️ InteriorDesign",
+        "🏠 HomeReno",
+        "🪞 Decor",
+        "🌿 Biophilic",
+        "🧱 Terracotta",
+        "🛏️ Japandi",
+        "Renovation",
+        "Open shelving",
+        "Color palette",
+        "Texture layering",
+        "DIY",
+        "Minimalism",
     ],
     "San Francisco Fog": [
         "🌁 Fog",
@@ -121,7 +133,7 @@ def random_datetime():
     return start + (end - start) * random.random()
 
 
-# Function to call OpenAI API to generate posts
+# Function to call Ollama to generate posts
 def generate_posts_list(topic, keywords):
     prompt = f"""
     Generate a list of {number_of_posts} unique social media posts about {topic}.
@@ -136,8 +148,8 @@ def generate_posts_list(topic, keywords):
     numbering the posts or using any list formatting.
     """
 
-    response: ChatCompletion = openai.chat.completions.create(
-        model=OPENAI_MODEL,
+    response = client.chat.completions.create(
+        model=OLLAMA_MODEL,
         messages=[
             {
                 "role": "system",
@@ -145,7 +157,6 @@ def generate_posts_list(topic, keywords):
             },
             {"role": "user", "content": prompt},
         ],
-        seed=RANDOM_SEED,
         max_tokens=1200,
         temperature=0.7,
     )
@@ -173,7 +184,8 @@ def main():
                 "created_at": random_datetime().isoformat(),
                 "modified_at": random_datetime().isoformat(),
                 "post_text": post_text,
-                "txt_embedding": [],  # Embedding field left blank
+                "generated_topic": topic,
+                "txt_embedding": [],
             }
             posts.append(post)
 
@@ -196,8 +208,8 @@ def main():
     Return each post as a separate line. Avoid numbering the posts or using any list formatting.
     """
     logger.info("Generating random posts")
-    response: ChatCompletion = openai.chat.completions.create(
-        model=OPENAI_MODEL,
+    response = client.chat.completions.create(
+        model=OLLAMA_MODEL,
         messages=[
             {
                 "role": "system",
@@ -205,8 +217,7 @@ def main():
             },
             {"role": "user", "content": random_topic_prompt},
         ],
-        seed=RANDOM_SEED,
-        max_tokens=1800,  # Adjusted to accommodate multiple posts
+        max_tokens=1800,
         temperature=0.7,
     )
 
@@ -224,8 +235,8 @@ def main():
             "created_at": random_datetime().isoformat(),
             "modified_at": random_datetime().isoformat(),
             "post_text": post_text,
-            "post_image": None,
-            "txt_embedding": [],  # Embedding field left blank
+            "generated_topic": "noise",
+            "txt_embedding": [],
         }
         posts.append(post)
 

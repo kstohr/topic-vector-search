@@ -5,11 +5,11 @@ description = "Materials for PyCon 2026 tutorial: Thinking of Topic Modeling as 
 authors = [{ name = "Kas Stohr", email = "kas@99antennas.com" }]
 readme = "README.md"
 license = { text = "MIT" }
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.13"
 
 dependencies = [
     "pydantic>=2.9.1",
-    "opensearch-py>=2.7.1",
+    "elasticsearch>=8.0,<9.0",
     "openai>=1.45.0",
     "sentence-transformers>=3.1.0",
     "bertopic>=0.16.3",
@@ -19,6 +19,11 @@ dependencies = [
     "streamlit>=1.35",
     "numpy>=1.26",
     "pandas>=2.0",
+    "httpx>=0.27",
+    "datasets>=2.0",
+    "Pillow>=10.0",
+    "torch>=2.0,<2.3",
+    "torchvision>=0.17,<0.18",
 ]
 
 [dependency-groups]
@@ -36,6 +41,13 @@ packages = ["src"]
 
 [tool.uv]
 package = false
+environments = [
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "sys_platform == 'linux' and platform_machine == 'aarch64'",
+    "sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    "sys_platform == 'win32'",
+]
 
 [tool.ruff]
 line-length = 100

@@ -1,8 +1,114 @@
 {
-  "0": {"label": "Feline Love Bond", "emoji": "🐱"},
-  "1": {"label": "Future Rail Connectivity", "emoji": "🚄"},
-  "2": {"label": "Musical Discovery Journey", "emoji": "🎵"},
-  "3": {"label": "Open Water Swimmer", "emoji": "🏊"},
-  "4": {"label": "Social Justice Activism", "emoji": "✊"},
-  "5": {"label": "Foggy City Vibes", "emoji": "🌁"}
+  "0": {
+    "label": "Unified Organizing Community",
+    "emoji": "💬"
+  },
+  "1": {
+    "label": "Pride and Unity Events",
+    "emoji": "💬"
+  },
+  "2": {
+    "label": "App User Interface Update",
+    "emoji": "🐱"
+  },
+  "3": {
+    "label": "Community Welcomes",
+    "emoji": "💬"
+  },
+  "4": {
+    "label": "Open Water Adventures",
+    "emoji": "🐱"
+  },
+  "5": {
+    "label": "Abortion Constitutional Amendments",
+    "emoji": "🐱"
+  },
+  "6": {
+    "label": "Florida Political Landscape",
+    "emoji": "💬"
+  },
+  "7": {
+    "label": "Cat Majesty and Love",
+    "emoji": "🐱"
+  },
+  "8": {
+    "label": "High Speed Rail Project",
+    "emoji": "🚄"
+  },
+  "9": {
+    "label": "Voting & Advocacy Efforts",
+    "emoji": "💬"
+  },
+  "10": {
+    "label": "Texas Trans Health Advocacy",
+    "emoji": "💬"
+  },
+  "11": {
+    "label": "Political Participation and Views",
+    "emoji": "🤖"
+  },
+  "12": {
+    "label": "Fog-Centric San Francisco",
+    "emoji": "🌁"
+  },
+  "13": {
+    "label": "Music Exploration and Sharing",
+    "emoji": "🎵"
+  },
+  "14": {
+    "label": "Supreme Court Controversies",
+    "emoji": "💬"
+  },
+  "15": {
+    "label": "Education Reforms and Practices",
+    "emoji": "💬"
+  },
+  "16": {
+    "label": "Interior Design Techniques",
+    "emoji": "🛋️"
+  },
+  "17": {
+    "label": "Stoic Maxims and Reflections",
+    "emoji": "💬"
+  },
+  "18": {
+    "label": "Austin News and Initiatives",
+    "emoji": "💬"
+  },
+  "19": {
+    "label": "Media and Hollywood Critiques",
+    "emoji": "💬"
+  },
+  "20": {
+    "label": "Leisure & Space🚀",
+    "emoji": "💬"
+  },
+  "21": {
+    "label": "Happy Gatherings and Studies",
+    "emoji": "🐱"
+  },
+  "22": {
+    "label": "Music & Culture Revolution",
+    "emoji": "🎵"
+  },
+  "23": {
+    "label": "Climate and Environmental Reporting",
+    "emoji": "🚀"
+  },
+  "24": {
+    "label": "Twitter Policy and Engineering Failures",
+    "emoji": "🤖"
+  },
+  "25": {
+    "label": "Chicago Events and Travel",
+    "emoji": "🤖"
+  },
+  "26": {
+    "label": "Government Funding & Defense Debates",
+    "emoji": "💬"
+  },
+  "27": {
+    "label": "Space Exploration and Rockets",
+    "emoji": "🚀"
+  }
 }

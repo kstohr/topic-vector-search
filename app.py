@@ -2,14 +2,18 @@
 Topic Vector Search — Workshop Demo
 Run with: uv run streamlit run app.py
 
-The app adapts automatically as workshop exercises are completed:
-  LO1  Lexical (LIKE) search · no trending topics
-  LO2  Embedding search · no trending topics
-  LO3  Embedding search · trending topics (topic-centroid embeddings)
-  LO4  Embedding search · trending topics (localized embeddings) ← full solution
-  LO5  Image posts appear in results via vision-model captions
+Update source code in src/ to see changes reflected in the app. All data is
+cached for fast reloads.
+
+To see changes, edit files in src/ and save. The app will automatically reload
+with the new code and data. The app uses Streamlit's caching to speed up
+reloads, so only changes to the source code or data files will trigger updates.
+You can also clear the cache if needed.
 """
 
+import base64
+import hashlib
+import html
 import json
 import sys
 from datetime import datetime, timezone
@@ -18,10 +22,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import streamlit as st
-from sentence_transformers import SentenceTransformer
 
-sys.path.insert(0, str(Path(__file__).parent / "src"))
-from search import InMemorySearcher, LexicalSearcher  # noqa: E402
+from src.search import get_searcher, get_topic_searcher, get_searcher_label, run_keyword_search, run_semantic_search, TEXT_SEARCH_ENGINES, TOPIC_SEARCH_ENGINES, _SEARCHER_LABELS
+from src.evaluation import build_result_rows, evaluate_topics  # noqa: E402
+from src.topic_ranking import rank_topics  # noqa: E402
 
 OUTPUT = Path(__file__).parent / "output"
 REPO = Path(__file__).parent
@@ -30,6 +34,17 @@ st.set_page_config(page_title="Topic Vector Search", layout="wide")
 
 st.markdown("""
 <style>
+.button_style {
+    background-color: #8B6FD4;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background-color 0.2s ease;
+}
+/* ── Trending topic cards ─────────────────────────────── */
 .topic-card {
     border: 1px solid #e0e0e0; border-radius: 10px;
     padding: 16px; text-align: center;
@@ -38,54 +53,93 @@ st.markdown("""
 .topic-label  { font-weight: 600; margin: 6px 0 4px; }
 .topic-stat   { color: #666; font-size: 0.85rem; }
 .topic-kw     { color: #999; font-size: 0.75rem; margin-top: 4px; }
-.mode-badge   { font-size: 0.75rem; color: #888; margin-bottom: 0.5rem; }
+
+/* ── Social feed cards ────────────────────────────────── */
+.feed-card {
+    border: 1px solid #e4e4e4;
+    border-radius: 12px;
+    padding: 18px 20px 12px;
+    margin-bottom: 14px;
+    background: #fff;
+}
+.feed-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+}
+.feed-avatar {
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 0.95rem;
+    color: #fff;
+    flex-shrink: 0;
+    margin-right: 10px;
+    letter-spacing: 0.5px;
+}
+.feed-author { font-weight: 600; font-size: 0.9rem; line-height: 1.2; }
+.feed-time   { margin-left: auto; color: #999; font-size: 0.82rem; white-space: nowrap; }
+.feed-topic-tag {
+    display: inline-block;
+    background: #eef2ff; color: #4a6fa5;
+    border-radius: 20px; padding: 2px 10px;
+    font-size: 0.72rem; margin-bottom: 8px;
+}
+.feed-text {
+    font-size: 0.92rem; line-height: 1.55;
+    color: #222; margin-bottom: 10px;
+    white-space: pre-wrap; word-break: break-word;
+}
+.feed-image {
+    width: 100%; border-radius: 8px;
+    margin-bottom: 10px; max-height: 380px;
+    object-fit: cover; display: block;
+}
+.feed-footer {
+    display: flex; align-items: center; gap: 18px;
+    padding-top: 8px; border-top: 1px solid #f0f0f0;
+    color: #777; font-size: 0.85rem;
+}
+.feed-footer .action { display: flex; align-items: center; gap: 4px; }
+.feed-score {
+    margin-left: auto; font-size: 0.72rem;
+    color: #bbb; white-space: nowrap;
+}
 </style>
 """, unsafe_allow_html=True)
 
 
-# ── Capability detection ────────────────────────────────────────────────────
 
-def _has_embeddings() -> bool:
-    """True if doc_index.json exists and at least one post has a non-empty embedding."""
-    path = OUTPUT / "doc_index.json"
-    if not path.exists():
-        return False
+# ── Startup: index posts into Elasticsearch ────────────────────────────────
+
+@st.cache_resource
+def _startup_index_posts() -> str:
+    """Index posts from sample_posts.json into Elasticsearch on first run."""
+    from elasticsearch import Elasticsearch
+    from src.index import INDEX_NAME, create_index
+
     try:
-        with open(path) as f:
-            index = json.load(f)
-        sample = next(iter(index.values()), {})
-        return len(sample.get("doc_embedding", [])) > 0
+        client = Elasticsearch("http://localhost:9200")
+        client.info()
     except Exception:
-        return False
+        return "Elasticsearch unavailable — skipping startup indexing."
 
+    create_index(client)
 
-def _has_topics() -> bool:
-    path = OUTPUT / "topic_assignments.csv"
-    if not path.exists():
-        return False
-    try:
-        df = pd.read_csv(path)
-        return len(df) > 0 and df["topic_id"].nunique() > 1
-    except Exception:
-        return False
+    if client.count(index=INDEX_NAME).get("count", 0) > 0:
+        return f"Index '{INDEX_NAME}' already populated."
 
-
-def _has_localized() -> bool:
-    path = OUTPUT / "topic_embeddings_localized.json"
-    if not path.exists():
-        return False
-    try:
-        with open(path) as f:
-            d = json.load(f)
-        return len(d) > 0
-    except Exception:
-        return False
-
-
-def _has_image_captions() -> bool:
     with open(REPO / "sample_posts.json") as f:
         posts = json.load(f)
-    return any(p.get("image_caption") for p in posts)
+
+    for post in posts:
+        doc = {k: v for k, v in post.items() if k != "doc_embedding" or v}
+        client.index(index=INDEX_NAME, id=post["post_id"], body=doc)
+
+    return f"Indexed {len(posts)} posts into '{INDEX_NAME}'."
+
+
+_startup_index_posts()
 
 
 # ── Data loading (all cached) ───────────────────────────────────────────────
@@ -103,10 +157,11 @@ def load_posts_by_id() -> dict[str, dict]:
 
 @st.cache_data
 def load_doc_index() -> list[dict]:
-    with open(OUTPUT / "doc_index.json") as f:
+    with open(OUTPUT / "processed_posts.json") as f:
         return list(json.load(f).values())
 
 
+# Displayed for informational purposes in "evaluation view" when running searches; not used by the search functions themselves.
 @st.cache_data
 def load_assignments() -> pd.DataFrame:
     return pd.read_csv(OUTPUT / "topic_assignments.csv")
@@ -127,146 +182,180 @@ def load_topic_labels() -> dict[int, dict]:
 
 
 @st.cache_resource
-def build_embedding_model() -> SentenceTransformer:
-    return SentenceTransformer("all-MiniLM-L6-v2")
+@st.cache_resource
+def build_searcher(engine: str):
+    return get_searcher(load_doc_index(), engine)
 
 
 @st.cache_resource
-def build_searcher():
-    if _has_embeddings():
-        return InMemorySearcher(load_doc_index())
-    return LexicalSearcher(load_raw_posts())
+def build_topic_searcher(engine: str):
+    return get_topic_searcher(load_doc_index(), engine)
 
-
-@st.cache_data
-def build_localized_embeddings() -> dict[int, list[float]]:
-    """Load from disk, or compute from keywords and save."""
-    path = OUTPUT / "topic_embeddings_localized.json"
-    if path.exists():
-        with open(path) as f:
-            return {int(k): v for k, v in json.load(f).items()}
-    # Generate and save
-    model = build_embedding_model()
-    keywords = load_topic_keywords()
-    result = {tid: model.encode(" ".join(ws[:10]), convert_to_numpy=True).tolist()
-              for tid, ws in keywords.items()}
-    with open(path, "w") as f:
-        json.dump({str(k): v for k, v in result.items()}, f)
-    return result
 
 
 @st.cache_data
-def build_naive_embeddings() -> dict[int, list[float]]:
-    """BERTopic centroid embeddings (used at LO3 before localized are available)."""
-    from bertopic import BERTopic
-    model = BERTopic.load(str(OUTPUT / "bertopic_model"))
-    labels = load_topic_labels()
-    return {tid: model.topic_embeddings_[tid + 1].tolist() for tid in labels}
+def load_topic_centroid_embeddings() -> dict[int, list[float]]:
+    with open(OUTPUT / "topic_centroid_embeddings.json") as f:
+        return {int(k): v for k, v in json.load(f).items()}
 
 
 @st.cache_data
-def compute_trending() -> list[dict]:
-    """Rank topics by aggregate likes + recency. Returns top 3."""
-    assignments = load_assignments()
-    posts_by_id = load_posts_by_id()
-    labels = load_topic_labels()
-    keywords = load_topic_keywords()
+def load_topic_embeddings() -> dict[int, list[float]]:
+    with open(OUTPUT / "topic_embeddings.json") as f:
+        return {int(k): v for k, v in json.load(f).items()}
 
-    def parse_ts(raw: str) -> float:
-        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt.timestamp()
 
-    most_recent_ts = max(parse_ts(p["created_at"]) for p in posts_by_id.values())
-
-    rows = []
-    for topic_id in sorted(labels.keys()):
-        post_ids = assignments.loc[assignments["topic_id"] == topic_id, "post_id"].tolist()
-        if not post_ids:
-            continue
-        total_likes = sum(posts_by_id.get(pid, {}).get("likes", 0) for pid in post_ids)
-        ts_list = [
-            parse_ts(posts_by_id[pid]["created_at"])
-            for pid in post_ids if pid in posts_by_id
-        ]
-        avg_days_ago = (most_recent_ts - sum(ts_list) / len(ts_list)) / 86400 if ts_list else 999
-        recency = max(0.0, 100.0 - (avg_days_ago / 365) * 100)
-        trending_score = total_likes * 0.65 + recency * 0.35
-
-        info = labels[topic_id]
-        rows.append({
-            "topic_id": topic_id,
-            "label": info["label"],
-            "emoji": info["emoji"],
-            "total_likes": total_likes,
-            "post_count": len(post_ids),
-            "trending_score": trending_score,
-            "keywords": keywords.get(topic_id, [])[:5],
-        })
-
-    rows.sort(key=lambda r: r["trending_score"], reverse=True)
-    return rows[:3]
+@st.cache_data
+def get_trending() -> list[dict]:
+    return rank_topics(
+        load_assignments(), load_posts_by_id(), load_topic_labels(), load_topic_keywords()
+    )
 
 
 # ── Search helpers ──────────────────────────────────────────────────────────
 
-def search_by_keywords(query: str, top_k: int = 20) -> pd.DataFrame:
-    searcher = build_searcher()
-    if isinstance(searcher, InMemorySearcher):
-        model = build_embedding_model()
-        embedding = model.encode(query, convert_to_numpy=True)
-        results = searcher.search_similar_documents(embedding, top_k=top_k)
-    else:
-        results = searcher.search_similar_documents(query, top_k=top_k)
-    return _results_to_df(results)
+def _search_by_text(query: str, top_k: int = 20) -> list[dict]:
+    """Text search from the search bar. Works with all four searchers in get_searcher()."""
+    return run_keyword_search(query, build_searcher(text_engine), top_k=top_k)
 
 
-def search_by_topic(topic_id: int, top_k: int = 20) -> pd.DataFrame:
-    searcher = build_searcher()
-    if _has_localized():
-        emb = np.array(build_localized_embeddings()[topic_id], dtype=np.float32)
-    else:
-        emb = np.array(build_naive_embeddings()[topic_id], dtype=np.float32)
-    results = searcher.search_similar_documents(emb, top_k=top_k)
-    return _results_to_df(results)
+def _topic_embeddings() -> dict[int, list[float]]:
+    if st.session_state.use_topic_centroid_embeddings:
+        return load_topic_centroid_embeddings()
+    return load_topic_embeddings()
 
 
-def _results_to_df(results: list[dict]) -> pd.DataFrame:
+def _search_by_topic(topic_id: int, top_k: int = 20) -> list[dict]:
+    """Topic embedding search. Always uses get_topic_searcher() — a semantic searcher."""
+    emb = np.array(_topic_embeddings()[topic_id], dtype=np.float32)
+    return run_semantic_search(emb, build_topic_searcher(topic_engine), top_k=top_k)
+
+
+# ── Image helper ────────────────────────────────────────────────────────────
+
+@st.cache_data
+def _image_uri(image_url: str) -> str:
+    """Convert a local assets/ path to a base64 data URI; pass through http URLs."""
+    if not image_url or image_url.startswith("http"):
+        return image_url or ""
+    img_path = REPO / image_url
+    if not img_path.exists():
+        return image_url
+    mime = "image/jpeg" if str(img_path).lower().endswith((".jpg", ".jpeg")) else "image/png"
+    b64 = base64.b64encode(img_path.read_bytes()).decode()
+    return f"data:{mime};base64,{b64}"
+
+
+# ── Feed rendering ──────────────────────────────────────────────────────────
+
+_AVATAR_COLORS = [
+    "#5B8DEF", "#8B6FD4", "#E8685A", "#3CB47A",
+    "#E8984A", "#4EC5C1", "#D46F96", "#7AAB58",
+]
+
+
+def _avatar_color(name: str) -> str:
+    idx = int(hashlib.md5(name.encode()).hexdigest(), 16) % len(_AVATAR_COLORS)
+    return _AVATAR_COLORS[idx]
+
+
+def _initials(name: str) -> str:
+    parts = name.split()
+    if len(parts) >= 2:
+        return (parts[0][0] + parts[-1][0]).upper()
+    return name[:2].upper() if name else "??"
+
+
+def _rel_time(dt_str: str) -> str:
+    try:
+        dt = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        days = (datetime.now(timezone.utc) - dt).days
+        if days < 1:
+            return "today"
+        if days < 7:
+            return f"{days}d"
+        if days < 30:
+            return f"{days // 7}w"
+        if days < 365:
+            return f"{days // 30}mo"
+        return f"{days // 365}y"
+    except Exception:
+        return ""
+
+
+def render_feed(results: list[dict]) -> None:
     posts_by_id = load_posts_by_id()
-    has_topics = _has_topics()
-    labels = load_topic_labels() if has_topics else {}
-    assignments = load_assignments() if has_topics else pd.DataFrame()
-    id_to_label = {tid: f"{v['emoji']} {v['label']}" for tid, v in labels.items()}
 
-    rows = []
     for r in results:
         pid = r.get("post_id", "")
         post = posts_by_id.get(pid, {})
-        text = r.get("post_text", "").strip()
+        author = post.get("post_author", "Unknown")
+        created_at = post.get("created_at", "")
+        likes = post.get("likes", 0)
+        post_text = r.get("post_text", "").strip()
+        image_url = post.get("image_url", "")
+        score = r.get("score", 0)
 
-        # LO5: show image caption for image-only posts
-        caption = post.get("image_caption") or ""
-        display_text = text if text else f"[image] {caption}" if caption else "[image — no caption yet]"
-        image_url = post.get("image_url")
+        # Avatar
+        color = _avatar_color(author)
+        initials = _initials(author)
+        rel_time = _rel_time(created_at)
 
-        topic_label = ""
-        if has_topics and not assignments.empty:
-            row = assignments.loc[assignments["post_id"] == pid, "topic_id"]
-            if len(row):
-                tid = int(row.values[0])
-                topic_label = id_to_label.get(tid, f"Topic {tid}")
+        # Text
+        if post_text:
+            text_html = f'<div class="feed-text">{html.escape(post_text)}</div>'
+        else:
+            text_html = '<div class="feed-text" style="color:#bbb;font-style:italic"></div>'
 
-        entry = {
-            "score": round(r.get("score", 0), 3),
-            "post": display_text,
-            "topic": topic_label,
-        }
+        # Image
+        image_html = ""
         if image_url:
-            entry["image"] = image_url
-        rows.append(entry)
+            uri = _image_uri(image_url)
+            if uri:
+                image_html = f'<img class="feed-image" src="{uri}" alt="post image">'
 
-    return pd.DataFrame(rows)
+        card = f"""
+<div class="feed-card">
+  <div class="feed-header">
+    <div class="feed-avatar" style="background:{color}">{html.escape(initials)}</div>
+    <div>
+      <div class="feed-author">{html.escape(author)}</div>
+    </div>
+    <div class="feed-time">{html.escape(rel_time)}</div>
+  </div>
+  {text_html}
+  {image_html}
+  <div class="feed-footer">
+    <span class="action">♡ {likes:,}</span>
+    <span class="action">○</span>
+    <span class="action">↗</span>
+    <span class="feed-score">score {score:.3f}</span>
+  </div>
+</div>"""
+        st.markdown(card, unsafe_allow_html=True)
+
+
+def render_results_eval(results: list[dict]) -> None:
+    rows = build_result_rows(
+        results, load_posts_by_id(), load_assignments(), load_topic_labels()
+    )
+    for row in rows:
+        if row["image_url"]:
+            row["image"] = _image_uri(row.pop("image_url"))
+        else:
+            row.pop("image_url")
+
+    df = pd.DataFrame(rows)
+    col_cfg = {
+        "score": st.column_config.NumberColumn("Score", format="%.3f", width="small", help="The search score for this post, normalized to [0, 1] for easier comparison across search engines."),
+        "post":  st.column_config.TextColumn("Post", width="large", help="The text content of the post."),
+        "topic": st.column_config.TextColumn("Topic", width="medium", help="The topic label assigned by BERTopic, if available."),
+    }
+    if "image" in df.columns:
+        col_cfg["image"] = st.column_config.ImageColumn("Image", width="small", help="The image associated with the post, if available.")
+    st.dataframe(df, use_container_width=True, column_config=col_cfg, hide_index=True)
 
 
 # ── Session state ───────────────────────────────────────────────────────────
@@ -275,107 +364,186 @@ if "active_topic" not in st.session_state:
     st.session_state.active_topic = None
 if "keyword_query" not in st.session_state:
     st.session_state.keyword_query = ""
+if "search_input" not in st.session_state:
+    st.session_state.search_input = ""
+if "_clear_search" not in st.session_state:
+    st.session_state._clear_search = False
+if "eval_view" not in st.session_state:
+    st.session_state.eval_view = False
+if "show_topic_eval" not in st.session_state:
+    st.session_state.show_topic_eval = False
+if "use_topic_centroid_embeddings" not in st.session_state:
+    st.session_state.use_topic_centroid_embeddings = False
 
+# Clear the search widget before it is instantiated (cannot be set after render)
+if st.session_state._clear_search:
+    st.session_state.search_input = ""
+    st.session_state._clear_search = False
 
-# ── Detect current workshop stage ──────────────────────────────────────────
-
-HAS_EMBEDDINGS = _has_embeddings()
-HAS_TOPICS = _has_topics()
-HAS_LOCALIZED = _has_localized()
-HAS_CAPTIONS = _has_image_captions()
-
-if HAS_LOCALIZED:
-    lo_stage, search_mode = "LO4 complete", "semantic · localized embeddings"
-elif HAS_TOPICS:
-    lo_stage, search_mode = "LO3 complete", "semantic · topic-centroid embeddings"
-elif HAS_EMBEDDINGS:
-    lo_stage, search_mode = "LO2 complete", "semantic search"
-else:
-    lo_stage, search_mode = "LO1", "lexical (keyword match)"
 
 
 # ── Layout ──────────────────────────────────────────────────────────────────
 
+with st.sidebar:
+    st.header("Demo App Controls")
+
+    st.caption("Clear the cache to pick up source code or data changes.")
+    if st.button("Clear cache", use_container_width=True):
+        st.cache_data.clear()
+        st.cache_resource.clear()
+        st.rerun()
+
+    st.header("Search Controls")
+    st.caption("Select which search engine to use for the search bar and topic search. Changes will apply on next search.")
+
+    text_engine = st.radio(
+        "Search bar engine",
+        options=TEXT_SEARCH_ENGINES,
+        format_func=lambda k: _SEARCHER_LABELS[k],
+    )
+    topic_engine = st.radio(
+        "Topic search engine",
+        options=TOPIC_SEARCH_ENGINES,
+        format_func=lambda k: _SEARCHER_LABELS[k],
+    )
+
+    st.header("Evaluation")
+
+    def _on_topic_eval_toggle():
+        st.session_state.show_topic_eval = not st.session_state.show_topic_eval
+        st.session_state.active_topic = None
+        st.session_state.keyword_query = ""
+        st.session_state._clear_search = True
+
+
+    st.toggle("Evaluate search results", value=st.session_state.eval_view, key="eval_view_sidebar",
+              on_change=lambda: setattr(st.session_state, "eval_view", not st.session_state.eval_view))
+
+    st.toggle("Evaluate topics", value=st.session_state.show_topic_eval, on_change=_on_topic_eval_toggle)
+
+    st.toggle(
+        "Use topic centroid embeddings",
+        key="use_topic_centroid_embeddings",
+        help="On: topic centroid embeddings — derived from top representative keywords (topic_centroid_embeddings.json). Off: topic embeddings — mean of document embeddings assigned to the topic (topic_embeddings.json).",
+    )
+
 st.title("Topic Vector Search")
 
-# Small status badge showing current workshop stage
-st.markdown(
-    f'<p class="mode-badge">🔧 {lo_stage} &nbsp;·&nbsp; search: {search_mode}'
-    + (" &nbsp;·&nbsp; 🖼 image captions active" if HAS_CAPTIONS else "")
-    + "</p>",
-    unsafe_allow_html=True,
-)
-
 # — Search bar —
-query_input = st.text_input(
+def _on_search_change():
+    st.session_state.keyword_query = st.session_state.search_input
+    st.session_state.active_topic = None
+    st.session_state.show_topic_eval = False
+
+st.text_input(
     label="search",
     placeholder="Search posts by keywords…",
-    value=st.session_state.keyword_query,
+    key="search_input",
+    on_change=_on_search_change,
     label_visibility="collapsed",
 )
-if query_input != st.session_state.keyword_query:
-    st.session_state.keyword_query = query_input
-    st.session_state.active_topic = None
 
 st.markdown("---")
 
 # — Trending topics —
 st.subheader("Trending")
 
-if not HAS_TOPICS:
-    st.info(
-        "Trending topics will appear here after completing **Learning Objective 3** "
-        "(Build a Topic Model Pipeline)."
-    )
-else:
-    trending = compute_trending()
-    cols = st.columns(3)
-    for col, topic in zip(cols, trending):
-        with col:
-            kw_str = " · ".join(topic["keywords"])
-            st.markdown(f"""
+trending = get_trending()
+cols = st.columns(3)
+for col, topic in zip(cols, trending):
+    with col:
+        kw_str = " · ".join(topic["keywords"])
+        st.markdown(f"""
 <div class="topic-card">
   <div class="topic-emoji">{topic['emoji']}</div>
   <div class="topic-label">{topic['label']}</div>
   <div class="topic-stat">❤️ {topic['total_likes']:,} likes &nbsp;·&nbsp; {topic['post_count']} posts</div>
   <div class="topic-kw">{kw_str}</div>
 </div>""", unsafe_allow_html=True)
-            if st.button("Search this topic", key=f"btn_{topic['topic_id']}"):
-                st.session_state.active_topic = topic["topic_id"]
-                st.session_state.keyword_query = ""
-                st.rerun()
+        if st.button("Search this topic", key=f"btn_{topic['topic_id']}"):
+            st.session_state.active_topic = topic["topic_id"]
+            st.session_state.keyword_query = ""
+            st.session_state._clear_search = True
+            st.session_state.show_topic_eval = False
+            st.rerun()
+
+if st.session_state.show_topic_eval:
+    with st.spinner("Evaluating topics…"):
+        eval_df = evaluate_topics(
+            load_topic_labels(),
+            load_assignments(),
+            _topic_embeddings(),
+            build_topic_searcher(topic_engine),
+            keywords=load_topic_keywords(),
+        )
+
+    labels = load_topic_labels()
+    topic_ids = sorted(labels.keys())
+
+    selection = st.dataframe(
+        eval_df,
+        use_container_width=True,
+        hide_index=True,
+        on_select="rerun",
+        selection_mode="single-row",
+        column_config={
+            "topic":          st.column_config.TextColumn("Topic", width="medium", help="The topic label assigned by BERTopic, if available."),
+            "keywords":       st.column_config.TextColumn("Keywords", width="large", help="Top keywords by c-TF-IDF score, computed during BERTopic training."),
+            "assigned_posts": st.column_config.NumberColumn("Assigned", width="small", help="Count of posts assigned to this topic based on BERTopic clustering."),
+            "results_matched":st.column_config.NumberColumn("Matched", width="small", help="Count of assigned posts returned when searching with exactly as many results as posts assigned to this topic."),
+            "match_ratio":    st.column_config.NumberColumn("Match Ratio", format="%.3f", width="small", help="Precision@assigned_count — matched / assigned_posts. Search size equals the number of posts assigned to each topic, so the ratio is not capped by a fixed top-k."),
+            "match_ratio_8":  st.column_config.NumberColumn("Match Ratio @8", format="%.3f", width="small", help="Proportion of assigned posts that appear in the top 8 search results for the topic embedding."),  # noqa
+            "median_score":   st.column_config.NumberColumn("Median Search Score", format="%.3f", width="small", help="Median search score of the assigned posts that appear in the search results for the topic embedding."),
+            "median_score_8": st.column_config.NumberColumn("Median Search Score @8", format="%.3f", width="small", help="Median search score of the assigned posts that appear in the top 8 search results for the topic embedding."),  # noqa
+        },
+    )
+
+    selected_rows = selection.selection.rows if selection else []
+    if selected_rows:
+        row_idx = selected_rows[0]
+        selected_topic_id = topic_ids[row_idx]
+        info = labels[selected_topic_id]
+        results = _search_by_topic(selected_topic_id)
+
+        embedding_strategy = "Topic centroid embedding" if st.session_state.use_topic_centroid_embeddings else "Topic embedding"
+        st.subheader(f"Results for {info['emoji']} {info['label']}")
+        st.caption(f"Search engine: {get_searcher_label(build_topic_searcher(topic_engine))} · Embedding: {embedding_strategy}")
+
+        if st.session_state.eval_view:
+            render_results_eval(results)
+        else:
+            render_feed(results)
 
 st.markdown("---")
 
-# — Results —
-col_cfg = {
-    "score": st.column_config.NumberColumn("Score", format="%.3f", width="small"),
-    "post":  st.column_config.TextColumn("Post", width="large"),
-    "topic": st.column_config.TextColumn("Topic", width="medium"),
-}
-
-if st.session_state.active_topic is not None:
+# — Results header + view toggle —
+if not st.session_state.show_topic_eval and (st.session_state.active_topic is not None or st.session_state.keyword_query.strip()):
     topic_id = st.session_state.active_topic
-    info = load_topic_labels().get(topic_id, {})
-    label = f"{info.get('emoji', '')} {info.get('label', f'Topic {topic_id}')}"
-    emb_note = "localized embedding" if HAS_LOCALIZED else "topic-centroid embedding"
-    st.subheader(f"Results for {label}")
-    st.caption(f"Searched using {emb_note}")
-    with st.spinner("Searching…"):
-        df = search_by_topic(topic_id)
-    if "image" in df.columns:
-        col_cfg["image"] = st.column_config.ImageColumn("Image", width="small")
-    st.dataframe(df, use_container_width=True, column_config=col_cfg, hide_index=True)
-
-elif st.session_state.keyword_query.strip():
     query = st.session_state.keyword_query.strip()
-    st.subheader(f'Results for "{query}"')
-    st.caption(f"Search mode: {search_mode}")
-    with st.spinner("Searching…"):
-        df = search_by_keywords(query)
-    if "image" in df.columns:
-        col_cfg["image"] = st.column_config.ImageColumn("Image", width="small")
-    st.dataframe(df, use_container_width=True, column_config=col_cfg, hide_index=True)
+
+    # Build header text and run search
+    if topic_id is not None:
+        info = load_topic_labels().get(topic_id, {})
+        label = f"{info.get('emoji', '')} {info.get('label', f'Topic {topic_id}')}"
+        header_text = f"Results for {label}"
+        with st.spinner("Searching…"):
+            results = _search_by_topic(topic_id)
+    else:
+        header_text = f'Results for "{query}"'
+        with st.spinner("Searching…"):
+            results = _search_by_text(query)
+
+    st.subheader(header_text)
+    if topic_id is not None:
+        embedding_strategy = "Topic centroid embedding" if st.session_state.use_topic_centroid_embeddings else "Topic embedding"
+        st.caption(f"Search engine: {get_searcher_label(build_topic_searcher(topic_engine))} · Embedding: {embedding_strategy}")
+    else:
+        st.caption(f"Search engine: {get_searcher_label(build_searcher(text_engine))}")
+
+    if st.session_state.eval_view:
+        render_results_eval(results)
+    else:
+        render_feed(results)
 
 else:
     st.markdown(

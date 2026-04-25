@@ -7,6 +7,8 @@ import numpy as np
 from pydantic import BaseModel, Field, field_validator
 from sentence_transformers import SentenceTransformer
 
+from src.config import EMBEDDING_MODEL_NAME
+
 
 # Define the Pydantic model for posts
 class PostDocument(BaseModel):
@@ -18,11 +20,12 @@ class PostDocument(BaseModel):
     likes: int = 0
     image_url: Optional[str] = None
     image_caption: Optional[str] = None  # populated by LO5 vision exercise
+    generated_topic: Optional[str] = None
     doc_embedding: Optional[List[float]] = Field(default_factory=list)
 
     @field_validator("created_at", "modified_at", mode="before")
     @classmethod
-    def set_datetime_to_utc(cls, value):
+    def set_datetime_to_utc(cls, value: str) -> str:
         # Parse the datetime string, convert to UTC, and return in ISO format
         dt = datetime.fromisoformat(value)
         if (
@@ -33,7 +36,7 @@ class PostDocument(BaseModel):
             dt = dt.astimezone(timezone.utc)
         return dt.isoformat()
 
-    def preprocess_text(self):
+    def preprocess_text(self) -> str:
         """
         Passed to model pipeline. Standard pre-processing of text after cleaning,
         prior to modeling. Does not include sentence splitting. If sentence
@@ -80,8 +83,8 @@ class PostDocument(BaseModel):
         return sentences
 
     # Create embeddings using SentenceTransformers and store them in the txt_embedding field
-    def create_embeddings(self):
-        model = SentenceTransformer("all-MiniLM-L6-v2")
+    def create_embeddings(self) -> None:
+        model = SentenceTransformer(EMBEDDING_MODEL_NAME)
         embeddings = model.encode(self.preprocess_sentences())
         self.doc_embedding = np.mean(embeddings, axis=0).tolist()
 
