@@ -41,6 +41,12 @@ packages = ["src"]
 
 [tool.uv]
 package = false
+constraint-dependencies = [
+    # Pin to versions with pre-built macOS x86_64 (Intel) wheels.
+    # llvmlite 0.44+ dropped Intel Mac wheels; 0.43.x pairs with numba 0.60.x.
+    "llvmlite<0.44",
+    "numba<0.61",
+]
 environments = [
     "sys_platform == 'linux' and platform_machine == 'x86_64'",
     "sys_platform == 'linux' and platform_machine == 'aarch64'",
