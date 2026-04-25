@@ -1,10 +1,10 @@
-## **Workshop Outline (Hands-On)**
+# **Workshop Outline (Hands-On)**
 
 **Session type:**   
 Tutorial   
 Duration 3 hours
 
-### **Revised Schedule (180 min)**
+## ** Schedule (180 min)**
 
 | # | Section | Time | Notes |
 |---|---------|------|-------|
@@ -19,6 +19,18 @@ Duration 3 hours
 | 8 | Evaluation & Production | 15 min | |
 | 9 | Wrap-Up & Extensions | 10 min | |
 | **Total** | | **180 min** | |
+
+
+## Learning Objectives 
+
+1. Understand the difference between keyword search (lexical/BM25) and semantic search 
+2. Implement semantic search. 
+3. Build a basic topic model 
+4. Retrieve topic-related documents by searching with topic embeddings
+4. Define key metrics and evaluate the topic model 
+5. Understand the key difference between searching with a topic-centroid embedding versus
+   searching with a localized topic embedding.
+6. Learn how to refine the pipeline to improve results. 
 
 ### **Description**
 
@@ -80,7 +92,7 @@ Participants will be asked to:
 
 * Clone the `topic-vector-search` repository  
 * Install dependencies via `pip` or `poetry` or `uv`  
-* (Optional) Have Docker installed to run OpenSearch locally  
+* (Optional) Have Docker installed to run Elasticsearch locally  
    *(A fallback in-memory / local vector option will be provided for participants who prefer not to run docker)*
 
 ---
@@ -187,7 +199,7 @@ Participants will be asked to:
 
 * Standing up a local vector-enabled search backend
 
-  * OpenSearch (via Docker)
+  * Elasticsearch (via Docker)
 
 * Creating indices for:
 

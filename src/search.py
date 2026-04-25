@@ -1,24 +1,68 @@
 import logging
-import os
 from typing import List, Union
 
 import numpy as np
-from opensearchpy import OpenSearch
+from elasticsearch import Elasticsearch
 from sentence_transformers import SentenceTransformer
 
-from models import PostDocument
+from src.config import EMBEDDING_MODEL_NAME
+from src.models import PostDocument
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+class KeywordSearcher:
+    """Keyword search (lexical/BM25) via Elasticsearch."""
 
-class Searcher:
-    def __init__(self, index_name: str, embedding_model_name: str = "all-MiniLM-L6-v2"):
+    def __init__(self, posts: List[dict], index_name: str = "post_docs"):
+        self.index_name = index_name
+        self.client = Elasticsearch("http://localhost:9200")
+
+    def search_similar_documents(
+        self, query: str, top_k: int = 20, filters: List[dict] = None
+    ) -> List[dict]:
+        body = {
+            "size": top_k,
+            "query": {"match": {"post_text": query}},
+        }
+        resp = self.client.search(index=self.index_name, body=body)
+        return [
+            {"score": hit["_score"], **{k: v for k, v in hit["_source"].items() if k != "doc_embedding"}}
+            for hit in resp["hits"]["hits"]
+        ]
+
+    def search(self, input_data: Union[List[str], str], top_k: int = 20) -> List[dict]:
+        query = " ".join(input_data) if isinstance(input_data, list) else str(input_data)
+        return self.search_similar_documents(query, top_k)
+
+
+class InMemoryKeywordSearcher:
+    """Keyword search (lexical substring match) over post text — no Elasticsearch required."""
+
+    def __init__(self, posts: List[dict]):
+        self.posts = posts
+
+    def search_similar_documents(
+        self, query: str, top_k: int = 20, filters: List[dict] = None
+    ) -> List[dict]:
+        q = query.lower()
+        results = [
+            {"score": 1.0, **{k: v for k, v in p.items() if k != "doc_embedding"}}
+            for p in self.posts
+            if q in p.get("post_text", "").lower()
+        ]
+        return results[:top_k]
+
+    def search(self, input_data: Union[List[str], str], top_k: int = 20) -> List[dict]:
+        query = " ".join(input_data) if isinstance(input_data, list) else str(input_data)
+        return self.search_similar_documents(query, top_k)
+
+
+class SemanticSearcher:
+    def __init__(self, posts: List[dict], index_name: str = "post_docs", embedding_model_name: str = EMBEDDING_MODEL_NAME):
         self.index_name = index_name
         self.embedding_model = SentenceTransformer(embedding_model_name)
-        self.opensearch_client = OpenSearch(
-            hosts=[{"host": "localhost", "port": 9200}], http_compress=True
-        )
+        self.client = Elasticsearch("http://localhost:9200")
 
     def convert_keywords_to_embedding(self, keywords: List[str]) -> np.ndarray:
         """Convert a list of keywords to an embedding using SentenceTransformers."""
@@ -30,40 +74,23 @@ class Searcher:
     def search_similar_documents(
         self,
         embedding: np.ndarray,
-        top_k: int = 1000,  # effectively no limit
+        top_k: int = 50,
         filters: List[dict] = None,
     ) -> List[dict]:
-        """Search for similar documents in OpenSearch using an embedding."""
-        logger.info("Searching for similar documents in OpenSearch.")
-
-        filters = filters or []
-
-        query = {
-            "size": top_k,
-            "query": {
-                "bool": {
-                    "must": [
-                        {
-                            "script_score": {
-                                "query": {"match_all": {}},
-                                "script": {
-                                    "source": "knn_score",
-                                    "lang": "knn",
-                                    "params": {
-                                        "field": "doc_embedding",
-                                        "query_value": embedding.tolist(),
-                                        "space_type": "cosinesimil",
-                                    },
-                                },
-                            }
-                        }
-                    ],
-                    "filter": filters,  # Apply filters if provided
-                }
+        """Search for similar documents in Elasticsearch using kNN."""
+        logger.info("Searching for similar documents in Elasticsearch.")
+        body = {
+            "knn": {
+                "field": "doc_embedding",
+                "query_vector": embedding.tolist(),
+                "k": top_k,
+                "num_candidates": min(top_k * 20, 10000),
             },
-            "sort": [{"_score": {"order": "desc"}}],
+            "size": top_k,
         }
-        response = self.opensearch_client.search(index=self.index_name, body=query)
+        if filters:
+            body["knn"]["filter"] = {"bool": {"must": filters}}
+        response = self.client.search(index=self.index_name, body=body)
         hits = response["hits"]["hits"]
         results = [{"score": hit["_score"], **hit["_source"]} for hit in hits]
         logger.info(f"Found {len(results)} similar documents.")
@@ -76,7 +103,7 @@ class Searcher:
         Search for similar documents using either a list of keywords or a provided embedding.
         :param input_data: A list of keywords to convert to an embedding or an embedding itself.
         :param top_k: The number of top similar documents to retrieve.
-        :return: A list of similar documents from OpenSearch.
+        :return: A list of similar documents from Elasticsearch.
         """
         # Determine if keywords are provided or if an embedding is directly provided
         if isinstance(input_data, list):
@@ -94,36 +121,15 @@ class Searcher:
         return self.search_similar_documents(embedding, top_k)
 
 
-class LexicalSearcher:
-    """LO1 placeholder: simple substring search (SQL LIKE equivalent).
-    Used when post embeddings have not yet been generated.
-    """
-
-    def __init__(self, posts: List[dict]):
-        self.posts = posts
-
-    def search_similar_documents(
-        self, query: str, top_k: int = 20, filters: List[dict] = None
-    ) -> List[dict]:
-        query_lower = query.lower()
-        results = [
-            {"score": 1.0, **{k: v for k, v in p.items() if k != "doc_embedding"}}
-            for p in self.posts
-            if query_lower in p.get("post_text", "").lower()
-        ]
-        return results[:top_k]
-
-    def search(self, input_data, top_k: int = 20) -> List[dict]:
-        query = " ".join(input_data) if isinstance(input_data, list) else str(input_data)
-        return self.search_similar_documents(query, top_k)
 
 
-class InMemorySearcher:
-    """Drop-in replacement for Searcher that works without OpenSearch.
+
+class InMemorySemanticSearcher:
+    """Drop-in replacement for Searcher that works without Elasticsearch.
     Uses cosine similarity over a numpy matrix of post embeddings.
     """
 
-    def __init__(self, posts: List[dict], embedding_model_name: str = "all-MiniLM-L6-v2"):
+    def __init__(self, posts: List[dict], embedding_model_name: str = EMBEDDING_MODEL_NAME):
         self.embedding_model = SentenceTransformer(embedding_model_name)
         self.posts = posts
         embeddings = np.array([p["doc_embedding"] for p in posts], dtype=np.float32)
@@ -160,13 +166,71 @@ class InMemorySearcher:
         return self.search_similar_documents(embedding, top_k)
 
 
+_SEARCHER_LABELS = {
+    "InMemoryKeywordSearcher":  "Keyword · in-memory",
+    "KeywordSearcher":          "Keyword (BM25) · Elasticsearch",
+    "InMemorySemanticSearcher": "Semantic · in-memory",
+    "SemanticSearcher":         "Semantic · Elasticsearch",
+}
+
+
+def get_searcher_label(searcher) -> str:
+    return _SEARCHER_LABELS.get(type(searcher).__name__, type(searcher).__name__)
+
+
+_SEARCHER_CLASSES = {
+    "InMemoryKeywordSearcher":  InMemoryKeywordSearcher,
+    "KeywordSearcher":          KeywordSearcher,
+    "InMemorySemanticSearcher": InMemorySemanticSearcher,
+    "SemanticSearcher":         SemanticSearcher,
+}
+
+TEXT_SEARCH_ENGINES = list(_SEARCHER_CLASSES.keys())
+TOPIC_SEARCH_ENGINES = ["InMemorySemanticSearcher", "SemanticSearcher"]
+
+
+def get_searcher(
+    posts: List[dict],
+    engine: str = "InMemorySemanticSearcher",
+) -> KeywordSearcher | InMemoryKeywordSearcher | InMemorySemanticSearcher | SemanticSearcher:
+    """Return the search engine for the search bar. engine must be a key in TEXT_SEARCH_ENGINES."""
+    if engine not in _SEARCHER_CLASSES:
+        raise ValueError(f"Unknown engine '{engine}'. Choose from: {TEXT_SEARCH_ENGINES}")
+    return _SEARCHER_CLASSES[engine](posts)
+
+
+def get_topic_searcher(
+    posts: List[dict],
+    engine: str = "InMemorySemanticSearcher",
+) -> InMemorySemanticSearcher | SemanticSearcher:
+    """Return the search engine for topic embedding search. engine must be a key in TOPIC_SEARCH_ENGINES."""
+    if engine not in TOPIC_SEARCH_ENGINES:
+        raise ValueError(f"Unknown topic engine '{engine}'. Choose from: {TOPIC_SEARCH_ENGINES}")
+    return _SEARCHER_CLASSES[engine](posts)
+
+
+def run_keyword_search(query: str, searcher, top_k: int = 20) -> List[dict]:
+    if hasattr(searcher, "embedding_model"):
+        embedding = searcher.embedding_model.encode(query, convert_to_numpy=True)
+        return searcher.search_similar_documents(embedding, top_k=top_k)
+    return searcher.search_similar_documents(query, top_k=top_k)
+
+
+def run_semantic_search(embedding: np.ndarray, searcher, top_k: int = 20) -> List[dict]:
+    if not hasattr(searcher, "embedding_model"):
+        raise TypeError(
+            f"{type(searcher).__name__} does not support embedding-based search. "
+            "Switch get_searcher() to return InMemorySemanticSearcher or SemanticSearcher."
+        )
+    return searcher.search_similar_documents(embedding, top_k=top_k)
+
+
 # Example usage
 if __name__ == "__main__":
-    from source import main
+    # from source import main
+    # main()  # Load, process, and store posts in Elasticsearch
 
-    # main()  # Load, process, and store posts in OpenSearch
-
-    searcher = Searcher(index_name="post_docs")
+    searcher = SemanticSearcher(index_name="post_docs")
 
     # Example 1: Search using keywords
     keywords = ["cat", "meow", "purr"]
@@ -178,7 +242,7 @@ if __name__ == "__main__":
     print("Search results using keywords:", results_text)
 
     # Example 2: Search using a direct embedding
-    example_embeddings = SentenceTransformer("all-MiniLM-L6-v2").encode(
+    example_embeddings = SentenceTransformer(EMBEDDING_MODEL_NAME).encode(
         ["cat", "meow", "purr"], convert_to_numpy=True
     )
     example_embedding = np.mean(

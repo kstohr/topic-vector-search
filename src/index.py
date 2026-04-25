@@ -1,44 +1,41 @@
-from opensearchpy import OpenSearch
+from elasticsearch import Elasticsearch
 
-# Define the OpenSearch index
 INDEX_NAME = "post_docs"
 INDEX_BODY = {
-    "settings": {"index.knn": True, "index": {"number_of_shards": 1}},
+    "settings": {"number_of_shards": 1},
     "mappings": {
         "properties": {
-            "post_id": {
-                "type": "keyword",
-                "doc_values": True,
-                "index": True,
-                "norms": False,
-            },
+            "post_id":     {"type": "keyword"},
             "post_author": {"type": "keyword"},
-            "created_at": {"type": "date", "format": "strict_date_time"},
-            "modified_at": {"type": "date", "format": "strict_date_time"},
-            "post_text": {"type": "text"},
+            "created_at":  {"type": "date"},
+            "modified_at": {"type": "date"},
+            "post_text":   {"type": "text"},
             "doc_embedding": {
-                "type": "knn_vector",
-                "dimension": 384,  # Match the dimensions used in SentenceTransformers
+                "type":       "dense_vector",
+                "dims":       384,
+                "index":      True,
+                "similarity": "cosine",
             },
         }
     },
 }
 
 
-# Function to create the OpenSearch index
-def create_index(opensearch_client):
-    if not opensearch_client.indices.exists(INDEX_NAME):
-        opensearch_client.indices.create(index=INDEX_NAME, body=INDEX_BODY)
+def get_client() -> Elasticsearch:
+    return Elasticsearch("http://localhost:9200")
+
+
+def create_index(client: Elasticsearch) -> None:
+    if not client.indices.exists(index=INDEX_NAME):
+        client.indices.create(index=INDEX_NAME, body=INDEX_BODY)
         print(f"Index '{INDEX_NAME}' created successfully.")
     else:
         print(f"Index '{INDEX_NAME}' already exists.")
 
 
-# Function to teardown the OpenSearch index 
-def delete_index(opensearch_client): 
-    if opensearch_client.indices.exists(INDEX_NAME):
-        opensearch_client.indices.delete(index=INDEX_NAME)
+def delete_index(client: Elasticsearch) -> None:
+    if client.indices.exists(index=INDEX_NAME):
+        client.indices.delete(index=INDEX_NAME)
         print(f"Index '{INDEX_NAME}' deleted successfully.")
     else:
-        print(f"Index '{INDEX_NAME}' does not exists.")
-            
+        print(f"Index '{INDEX_NAME}' does not exist.")
