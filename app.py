@@ -146,7 +146,7 @@ _startup_index_posts()
 
 @st.cache_data
 def load_raw_posts() -> list[dict]:
-    with open(REPO / "sample_posts.json") as f:
+    with open(REPO / "sample_posts.json", encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -157,19 +157,19 @@ def load_posts_by_id() -> dict[str, dict]:
 
 @st.cache_data
 def load_doc_index() -> list[dict]:
-    with open(OUTPUT / "processed_posts.json") as f:
+    with open(OUTPUT / "processed_posts.json", encoding="utf-8") as f:
         return list(json.load(f).values())
 
 
 # Displayed for informational purposes in "evaluation view" when running searches; not used by the search functions themselves.
 @st.cache_data
 def load_assignments() -> pd.DataFrame:
-    return pd.read_csv(OUTPUT / "topic_assignments.csv")
+    return pd.read_csv(OUTPUT / "topic_assignments.csv", encoding="utf-8")
 
 
 @st.cache_data
 def load_topic_keywords() -> dict[int, list[str]]:
-    with open(OUTPUT / "bertopic_model" / "topics.json") as f:
+    with open(OUTPUT / "bertopic_model" / "topics.json", encoding="utf-8") as f:
         data = json.load(f)
     reps = data.get("topic_representations", {})
     return {int(k): [w for w, _ in v] for k, v in reps.items() if int(k) != -1}
@@ -177,7 +177,7 @@ def load_topic_keywords() -> dict[int, list[str]]:
 
 @st.cache_data
 def load_topic_labels() -> dict[int, dict]:
-    with open(OUTPUT / "topic_labels.json") as f:
+    with open(OUTPUT / "topic_labels.json", encoding="utf-8") as f:
         return {int(k): v for k, v in json.load(f).items()}
 
 
@@ -195,13 +195,13 @@ def build_topic_searcher(engine: str):
 
 @st.cache_data
 def load_topic_centroid_embeddings() -> dict[int, list[float]]:
-    with open(OUTPUT / "topic_centroid_embeddings.json") as f:
+    with open(OUTPUT / "topic_centroid_embeddings.json", encoding="utf-8") as f:
         return {int(k): v for k, v in json.load(f).items()}
 
 
 @st.cache_data
 def load_topic_embeddings() -> dict[int, list[float]]:
-    with open(OUTPUT / "topic_embeddings.json") as f:
+    with open(OUTPUT / "topic_embeddings.json", encoding="utf-8") as f:
         return {int(k): v for k, v in json.load(f).items()}
 
 
