@@ -5,7 +5,7 @@ import numpy as np
 from elasticsearch import Elasticsearch
 from sentence_transformers import SentenceTransformer
 
-from src.config import EMBEDDING_MODEL_NAME
+from src.config import ELASTICSEARCH_URL, EMBEDDING_MODEL_NAME
 from src.models import PostDocument
 
 logging.basicConfig(level=logging.INFO)
@@ -16,7 +16,7 @@ class KeywordSearcher:
 
     def __init__(self, posts: List[dict], index_name: str = "post_docs"):
         self.index_name = index_name
-        self.client = Elasticsearch("http://localhost:9200")
+        self.client = Elasticsearch(ELASTICSEARCH_URL)
 
     def search_similar_documents(
         self, query: str, top_k: int = 20, filters: List[dict] = None
@@ -59,10 +59,17 @@ class InMemoryKeywordSearcher:
 
 
 class SemanticSearcher:
+    """
+    Semantic search via Elasticsearch vector search.
+
+    Reference:
+    https://www.elastic.co/docs/solutions/search/vector/knn#knn-semantic-search
+    https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-script-score-query.html
+    """
     def __init__(self, posts: List[dict], index_name: str = "post_docs", embedding_model_name: str = EMBEDDING_MODEL_NAME):
         self.index_name = index_name
         self.embedding_model = SentenceTransformer(embedding_model_name)
-        self.client = Elasticsearch("http://localhost:9200")
+        self.client = Elasticsearch(ELASTICSEARCH_URL)
 
     def convert_keywords_to_embedding(self, keywords: List[str]) -> np.ndarray:
         """Convert a list of keywords to an embedding using SentenceTransformers."""
@@ -74,30 +81,45 @@ class SemanticSearcher:
     def search_similar_documents(
         self,
         embedding: np.ndarray,
-        top_k: int = 50,
+        top_k: int | None = None,
         filters: List[dict] = None,
     ) -> List[dict]:
-        """Search for similar documents in Elasticsearch using kNN."""
-        logger.info("Searching for similar documents in Elasticsearch.")
+        """Vector search in Elasticsearch.
+
+        - If top_k is set: return top_k docs ranked by cosine similarity.
+        - If top_k is None: return all matching docs ranked by cosine similarity.
+        """
+        # Elasticsearch requires a fixed size, so we set it to top_k or a large
+        # number if top_k is None.
+        # In production, you might implement pagination
+        size = top_k if top_k is not None else 1000
+
+        # Build the query with optional filters (e.g., by author or date range)
+        filter_query = {
+            "bool": {"filter": filters}
+        } if filters else {"match_all": {}}
+
         body = {
-            "knn": {
-                "field": "doc_embedding",
-                "query_vector": embedding.tolist(),
-                "k": top_k,
-                "num_candidates": min(top_k * 20, 10000),
+            "size": size,
+            "query": {
+                "script_score": {
+                    "query": filter_query,
+                    "script": {
+                        "source": "cosineSimilarity(params.query_vector, 'doc_embedding') + 1.0",
+                        "params": {"query_vector": embedding.tolist()},
+                    },
+                }
             },
-            "size": top_k,
         }
-        if filters:
-            body["knn"]["filter"] = {"bool": {"must": filters}}
+
         response = self.client.search(index=self.index_name, body=body)
         hits = response["hits"]["hits"]
         results = [{"score": hit["_score"], **hit["_source"]} for hit in hits]
-        logger.info(f"Found {len(results)} similar documents.")
+        logger.info(f"Found {len(results)} similar documents (top_k={top_k}, size={size}).")
         return results
 
     def search(
-        self, input_data: Union[List[str], np.ndarray], top_k: int = 5
+        self, input_data: Union[List[str], np.ndarray], top_k: int | None = None
     ) -> List[dict]:
         """
         Search for similar documents using either a list of keywords or a provided embedding.
@@ -209,14 +231,14 @@ def get_topic_searcher(
     return _SEARCHER_CLASSES[engine](posts)
 
 
-def run_keyword_search(query: str, searcher, top_k: int = 20) -> List[dict]:
+def run_keyword_search(query: str, searcher, top_k: int | None = 20) -> List[dict]:
     if hasattr(searcher, "embedding_model"):
         embedding = searcher.embedding_model.encode(query, convert_to_numpy=True)
         return searcher.search_similar_documents(embedding, top_k=top_k)
     return searcher.search_similar_documents(query, top_k=top_k)
 
 
-def run_semantic_search(embedding: np.ndarray, searcher, top_k: int = 20) -> List[dict]:
+def run_semantic_search(embedding: np.ndarray, searcher, top_k: int | None = 20) -> List[dict]:
     if not hasattr(searcher, "embedding_model"):
         raise TypeError(
             f"{type(searcher).__name__} does not support embedding-based search. "

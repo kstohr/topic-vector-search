@@ -16,3 +16,6 @@ VISION_MODEL_NAME = "Salesforce/blip-image-captioning-base"
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/v1")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:3b")
 OPENAI_MODEL = "gpt-4o-mini"
+
+# Search backend (matches docker-compose host mapping)
+ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL", "http://localhost:9201")

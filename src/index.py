@@ -1,5 +1,7 @@
 from elasticsearch import Elasticsearch
 
+from src.config import ELASTICSEARCH_URL
+
 INDEX_NAME = "post_docs"
 INDEX_BODY = {
     "settings": {"number_of_shards": 1},
@@ -14,7 +16,7 @@ INDEX_BODY = {
                 "type":       "dense_vector",
                 "dims":       384,
                 "index":      True,
-                "similarity": "cosine",
+                "similarity": "cosine", # Distance metric
             },
         }
     },
@@ -22,7 +24,7 @@ INDEX_BODY = {
 
 
 def get_client() -> Elasticsearch:
-    return Elasticsearch("http://localhost:9200")
+    return Elasticsearch(ELASTICSEARCH_URL)
 
 
 def create_index(client: Elasticsearch) -> None:

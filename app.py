@@ -23,6 +23,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
+from src.config import ELASTICSEARCH_URL
 from src.search import get_searcher, get_topic_searcher, get_searcher_label, run_keyword_search, run_semantic_search, TEXT_SEARCH_ENGINES, TOPIC_SEARCH_ENGINES, _SEARCHER_LABELS
 from src.evaluation import build_result_rows, evaluate_topics  # noqa: E402
 from src.topic_ranking import rank_topics  # noqa: E402
@@ -119,7 +120,7 @@ def _startup_index_posts() -> str:
     from src.index import INDEX_NAME, create_index
 
     try:
-        client = Elasticsearch("http://localhost:9200")
+        client = Elasticsearch(ELASTICSEARCH_URL)
         client.info()
     except Exception:
         return "Elasticsearch unavailable — skipping startup indexing."
@@ -214,7 +215,7 @@ def get_trending() -> list[dict]:
 
 # ── Search helpers ──────────────────────────────────────────────────────────
 
-def _search_by_text(query: str, top_k: int = 20) -> list[dict]:
+def _search_by_text(query: str, top_k: int | None = None) -> list[dict]:
     """Text search from the search bar. Works with all four searchers in get_searcher()."""
     return run_keyword_search(query, build_searcher(text_engine), top_k=top_k)
 
@@ -225,7 +226,7 @@ def _topic_embeddings() -> dict[int, list[float]]:
     return load_topic_embeddings()
 
 
-def _search_by_topic(topic_id: int, top_k: int = 20) -> list[dict]:
+def _search_by_topic(topic_id: int, top_k: int | None = None) -> list[dict]:
     """Topic embedding search. Always uses get_topic_searcher() — a semantic searcher."""
     emb = np.array(_topic_embeddings()[topic_id], dtype=np.float32)
     return run_semantic_search(emb, build_topic_searcher(topic_engine), top_k=top_k)
@@ -355,7 +356,7 @@ def render_results_eval(results: list[dict]) -> None:
     }
     if "image" in df.columns:
         col_cfg["image"] = st.column_config.ImageColumn("Image", width="small", help="The image associated with the post, if available.")
-    st.dataframe(df, use_container_width=True, column_config=col_cfg, hide_index=True)
+    st.dataframe(df, width='stretch', column_config=col_cfg, hide_index=True)
 
 
 # ── Session state ───────────────────────────────────────────────────────────
@@ -388,7 +389,7 @@ with st.sidebar:
     st.header("Demo App Controls")
 
     st.caption("Clear the cache to pick up source code or data changes.")
-    if st.button("Clear cache", use_container_width=True):
+    if st.button("Clear cache", width='stretch'):
         st.cache_data.clear()
         st.cache_resource.clear()
         st.rerun()
@@ -482,7 +483,7 @@ if st.session_state.show_topic_eval:
 
     selection = st.dataframe(
         eval_df,
-        use_container_width=True,
+        width='stretch',
         hide_index=True,
         on_select="rerun",
         selection_mode="single-row",

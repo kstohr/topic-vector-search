@@ -21,7 +21,14 @@ from elasticsearch import Elasticsearch
 from sentence_transformers import SentenceTransformer
 
 from src.models import PostDocument
-from src.config import EMBEDDING_DIMENSION, EMBEDDING_MODEL_NAME, OUTPUT, REPO, VISION_MODEL_NAME
+from src.config import (
+    ELASTICSEARCH_URL,
+    EMBEDDING_DIMENSION,
+    EMBEDDING_MODEL_NAME,
+    OUTPUT,
+    REPO,
+    VISION_MODEL_NAME,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +140,7 @@ def generate_embeddings(posts: list[dict], model: SentenceTransformer) -> list[d
 
 def _try_elasticsearch_client() -> Elasticsearch | None:
     try:
-        client = Elasticsearch("http://localhost:9200")
+        client = Elasticsearch(ELASTICSEARCH_URL)
         client.info()
         return client
     except Exception:

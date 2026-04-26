@@ -27,7 +27,6 @@ import re
 from pathlib import Path
 from typing import List, Tuple
 
-import hdbscan
 import numpy as np
 import pandas as pd
 from bertopic import BERTopic
@@ -36,17 +35,23 @@ from bertopic.representation import OpenAI as BertTopicOpenAI
 from bertopic.vectorizers import ClassTfidfTransformer
 from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import CountVectorizer
-from umap import UMAP
 
 from src.models import PostDocument
 from src.preprocess import embedding_text
 
-from src.config import EMBEDDING_MODEL_NAME as EMBEDDING_MODEL, OLLAMA_URL, OLLAMA_MODEL, OPENAI_MODEL, OUTPUT, REPO
+from src.config import (
+    ELASTICSEARCH_URL,
+    EMBEDDING_MODEL_NAME as EMBEDDING_MODEL,
+    OLLAMA_URL,
+    OLLAMA_MODEL,
+    OPENAI_MODEL,
+    OUTPUT,
+    REPO,
+)
 
 logger = logging.getLogger(__name__)
 
 RANDOM_SEED = 99
-
 
 LABEL_PROMPT = """
 I have a topic that contains the following documents:
@@ -105,7 +110,7 @@ def _build_llm_representation() -> BertTopicOpenAI | None:
 
     api_key = os.getenv("OPENAI_API_KEY")
     if api_key:
-        logger.info("Using OpenAI API (gpt-4o-mini) for topic labels.")
+        logger.info("Using OpenAI API for topic labels.")
         client = OpenAI(
             api_key=api_key,
             organization=os.getenv("OPENAI_ORGANIZATION"),
@@ -133,7 +138,7 @@ class TopicModeler:
     def _try_elasticsearch(self):
         try:
             from elasticsearch import Elasticsearch
-            client = Elasticsearch("http://localhost:9200")
+            client = Elasticsearch(ELASTICSEARCH_URL)
             client.info()
             logger.info("Elasticsearch connection established.")
             return client
@@ -206,21 +211,10 @@ class TopicModeler:
         embeddings_np = np.array(embeddings, dtype=np.float32)
         logger.info(f"Training on {len(texts)} posts.")
 
-        vectorizer = CountVectorizer(stop_words="english")
-        umap_model = UMAP(
-            n_neighbors=15,
-            n_components=5,
-            min_dist=0.0,
-            metric="cosine",
-            random_state=RANDOM_SEED,
-                          )
-        hdbscan_model = hdbscan.HDBSCAN(
-            min_cluster_size=10,
-            min_samples=5,
-            metric="euclidean",
-            cluster_selection_method="eom",
-            cluster_selection_epsilon=0.001,
-            prediction_data=True,
+        vectorizer = CountVectorizer(
+            min_df=2,
+            ngram_range=(1, 3),
+            stop_words="english",
         )
         keybert_model = KeyBERTInspired(
             top_n_words=10,
@@ -229,7 +223,6 @@ class TopicModeler:
             nr_candidate_words=100,
             random_state=RANDOM_SEED,
         )
-
         llm_model = _build_llm_representation()
         representation = {"KeyBERT": keybert_model}
         if llm_model:
@@ -237,12 +230,14 @@ class TopicModeler:
 
         self.topic_model = BERTopic(
             embedding_model=self.embedding_model,
-            umap_model=umap_model,
-            hdbscan_model=hdbscan_model,
             vectorizer_model=vectorizer,
             ctfidf_model=ClassTfidfTransformer(),
             representation_model=representation,
+            min_topic_size=10,
+            n_gram_range=(1, 3),
+            top_n_words=10,
             calculate_probabilities=True,
+            verbose=True,
         )
 
         self.topics, self.probabilities = self.topic_model.fit_transform(
