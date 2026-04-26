@@ -8,8 +8,7 @@ Run:
     uv run python -m src.preloading
 
 What it does:
-  1. Connects to Elasticsearch at localhost:9200
-  2. Creates the post_docs index (if it doesn't exist)
+  1. Connects to Elasticsearch at ELASTICSEARCH_URL (default localhost:9201)
   3. Bulk-indexes all posts from sample_posts.json
 
 After this runs, the Elasticsearch-backed KeywordSearcher and the
@@ -23,7 +22,7 @@ from pathlib import Path
 
 from elasticsearch import Elasticsearch, helpers
 
-from src.config import REPO
+from src.config import ELASTICSEARCH_URL, REPO
 from src.index import INDEX_NAME, create_index
 from src.models import PostDocument
 
@@ -55,11 +54,11 @@ def index_posts(client: Elasticsearch, posts: list[PostDocument]) -> None:
 
 
 def run() -> None:
-    client = Elasticsearch("http://localhost:9200")
+    client = Elasticsearch(ELASTICSEARCH_URL)
     try:
         client.info()
     except Exception as e:
-        logger.error(f"Cannot connect to Elasticsearch at localhost:9200 — {e}")
+        logger.error(f"Cannot connect to Elasticsearch at {ELASTICSEARCH_URL} — {e}")
         return
 
     create_index(client)

@@ -9,7 +9,7 @@ services:
       - xpack.security.http.ssl.enabled=false
       - ES_JAVA_OPTS=-Xms512m -Xmx512m
     ports:
-      - 9200:9200
+      - 9201:9200
 
   ollama:
     image: ollama/ollama:latest

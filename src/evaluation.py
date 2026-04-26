@@ -83,9 +83,7 @@ def evaluate_topics(
         emb = np.array(topic_centroid_embeddings[topic_id], dtype=np.float32)
         assigned = assigned_by_topic.get(topic_id, set())
 
-        # Search for exactly as many posts as are assigned to this topic —
-        # matches the production evaluation approach and removes the cap bias.
-        top_k = max(len(assigned), top_n)
+        top_k = len(assigned)
         results = run_semantic_search(emb, searcher, top_k=top_k)
 
         scores = [r["score"] for r in results]

@@ -22,7 +22,7 @@ docker compose up -d
 ```
 
 This starts two containers:
-- **Elasticsearch** on port 9200 — vector database (optional, in-memory fallback provided)
+- **Elasticsearch** on port 9201 — vector database (optional, in-memory fallback provided)
 - **Ollama** on port 11434 — local LLM for topic labeling, automatically pulls `qwen2.5:3b` (~1.9 GB)
 
 > **No Docker?** All exercises still work. Search uses an in-memory fallback and topic labels
