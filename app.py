@@ -226,8 +226,8 @@ def build_topic_searcher(engine: str):
 
 
 @st.cache_data
-def load_topic_centroid_embeddings() -> dict[int, list[float]]:
-    path = OUTPUT / "topic_centroid_embeddings.json"
+def load_topic_keyword_embeddings() -> dict[int, list[float]]:
+    path = OUTPUT / "topic_keyword_embeddings.json"
     if not path.exists():
         return {}
     with open(path, encoding="utf-8") as f:
@@ -259,8 +259,8 @@ def _search_by_text(query: str, top_k: int) -> list[dict]:
 
 
 def _topic_embeddings() -> dict[int, list[float]]:
-    if st.session_state.use_topic_centroid_embeddings:
-        return load_topic_centroid_embeddings()
+    if st.session_state.use_topic_keyword_embeddings:
+        return load_topic_keyword_embeddings()
     return load_topic_embeddings()
 
 
@@ -429,8 +429,8 @@ if "eval_view" not in st.session_state:
     st.session_state.eval_view = False
 if "show_topic_eval" not in st.session_state:
     st.session_state.show_topic_eval = False
-if "use_topic_centroid_embeddings" not in st.session_state:
-    st.session_state.use_topic_centroid_embeddings = False
+if "use_topic_keyword_embeddings" not in st.session_state:
+    st.session_state.use_topic_keyword_embeddings = False
 if "eval_selected_topic_id" not in st.session_state:
     st.session_state.eval_selected_topic_id = None
 
@@ -488,11 +488,11 @@ with st.sidebar:
     )
 
     st.toggle(
-        "Use topic centroid embeddings",
-        key="use_topic_centroid_embeddings",
+        "Use topic keyword embeddings",
+        key="use_topic_keyword_embeddings",
         help=(
-            "On: centroid of top keywords (topic_centroid_embeddings.json). "
-            "Off: mean of assigned doc embeddings (topic_embeddings.json)."
+            "On: topic keyword embeddings from top keywords (topic_keyword_embeddings.json). "
+            "Off: topic embeddings — mean of assigned doc embeddings (topic_embeddings.json)."
         ),
     )
 
@@ -640,8 +640,8 @@ if st.session_state.show_topic_eval:
         results = _search_by_topic(active_eval_topic, top_k=DEFAULT_EVAL_K)
 
         embedding_strategy = (
-            "Topic centroid embedding"
-            if st.session_state.use_topic_centroid_embeddings
+            "Topic keyword embedding"
+            if st.session_state.use_topic_keyword_embeddings
             else "Topic embedding"
         )
         st.subheader(f"Results for {info['emoji']} {info['label']}")
@@ -677,8 +677,8 @@ if not st.session_state.show_topic_eval and (
     st.subheader(header_text)
     if topic_id is not None:
         embedding_strategy = (
-            "Topic centroid embedding"
-            if st.session_state.use_topic_centroid_embeddings
+            "Topic keyword embedding"
+            if st.session_state.use_topic_keyword_embeddings
             else "Topic embedding"
         )
         engine_label = get_searcher_label(build_topic_searcher(topic_engine))
