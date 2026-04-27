@@ -1,8 +1,192 @@
+"""
+Evaluation metrics for topic search:
+
+- Evaluation-k (e.g., K=100): number of results returned by search.
+This is passed to the "size" parameter of the search query and determines the
+total number of results returned by search for evaluation. This should be large
+enough to capture all relevant posts for fair evaluation, but not so large that
+it includes a lot of noise. Should be tuned based on corpus size and typical
+search depth in your application.
+
+- Recall@K: coverage of topic within top-K results (e.g., K=100)
+How many of the assigned posts are retrieved by search. Should be large enough
+to capture all relevant posts for fair evaluation. Here we set it to a value
+greater than the number of posts assigned to most topics.
+
+- Precision@K: quality of top-K results (e.g., K=8)
+How many of the assigned posts appear in the top K results; where "k" is set to
+a typical value for search results displayed before pagination (e.g., 8 or 10).
+
+- Baseline precision: expected precision of a random baseline for topic of this
+size within the dataset
+Random baseline precision: If we were to randomly select K posts from the
+entire corpus, what precision would we expect? This can be computed as (number
+of relevant posts) / (total number of posts). This baseline helps us
+understand how much better our search is compared to random chance. We compute
+this for each topic and include it in the evaluation metrics for context.
+"""
+
+from typing import Any
+
 import numpy as np
 import pandas as pd
+from pydantic import BaseModel, ConfigDict, PositiveInt
+
+from src.search import run_semantic_search
+
+DEFAULT_EVAL_K = 100
+DEFAULT_RECALL_K = 100
+DEFAULT_PRECISION_K = 8
 
 
-def build_result_rows(
+def compute_random_baseline(topic_size: int, dataset_size: int):
+    """Computes the expected precision of a random baseline for a given topic."""
+    return topic_size / dataset_size
+
+
+class TopicSearchMetricArgs(BaseModel):
+    dataset_size: PositiveInt  # Used to compute random baseline precision
+    retrieved_ids: list[str]
+    topic_post_ids: set[str]
+    recall_k: PositiveInt = DEFAULT_RECALL_K
+    precision_k: PositiveInt = DEFAULT_PRECISION_K
+
+
+class TopicSearchMetrics(BaseModel):
+    precision_at_k: float = 0.0
+    recall_at_k: float = 0.0
+    baseline: float = 0.0
+    num_posts_assigned_to_topic: int = 0
+    num_retrieved_by_search: int = 0
+    precision_hits: int = 0
+    recall_hits: int = 0
+
+
+def compute_topic_search_eval_metrics(args: TopicSearchMetricArgs) -> TopicSearchMetrics:
+    """
+    Computes:
+    - Recall@K: coverage of topic within top-K results (e.g., K=20)
+    - Precision@K: quality of top-K results (e.g., K=8)
+    - Baseline precision: expected precision of a random baseline for topic of
+    this size within the corpus
+
+    Assumes retrieved_ids are ordered by relevance (highest score first).
+    """
+    # --- Precision@K ---
+    top_precision_k = args.retrieved_ids[: args.precision_k]
+    precision_hits = sum(pid in args.topic_post_ids for pid in top_precision_k)
+    precision_at_k = precision_hits / args.precision_k
+
+    # --- Recall@K ---
+    top_recall_k = args.retrieved_ids[: args.recall_k]
+    recall_hits = sum(pid in args.topic_post_ids for pid in top_recall_k)
+    recall_at_k = recall_hits / len(args.topic_post_ids)
+
+    # --- Baseline precision ---
+    baseline = compute_random_baseline(len(args.topic_post_ids), args.dataset_size)
+
+    return TopicSearchMetrics(
+        precision_at_k=precision_at_k,
+        recall_at_k=recall_at_k,
+        baseline=baseline,
+        num_posts_assigned_to_topic=len(args.topic_post_ids),
+        num_retrieved_by_search=len(args.retrieved_ids),
+        precision_hits=precision_hits,
+        recall_hits=recall_hits,
+    )
+
+
+class TopicEvalArgs(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    corpus_size: int
+    labels: dict[int, dict]
+    assignments: pd.DataFrame
+    topic_embeddings: dict[int, list[float]]
+    searcher: Any  # InMemorySemanticSearcher | SemanticSearcher
+    keywords: dict[int, list[str]] | None = None
+    eval_k: int = DEFAULT_EVAL_K
+
+
+class TopicEvalRow(TopicSearchMetrics):
+    topic: str
+    keywords: str
+    assigned_posts: int
+    avg_search_score: float
+
+
+def evaluate_topics(args: TopicEvalArgs) -> pd.DataFrame:
+    """
+    For each topic, run a semantic search using its embedding and compute
+    precision metrics against the ground-truth topic assignments.
+
+    Note: Search depth can change the results significantly.
+
+    Columns returned:
+      topic           — label with emoji
+      keywords        — top keywords by c-TF-IDF score, computed during BERTopic training
+      assigned_posts  — how many posts were assigned to this topic by BERTopic
+      avg_search_score — average semantic search score for the evaluation results
+      ** Topic search evaluation metrics (precision@K, recall@K, random baseline
+      precision, etc.) computed by compute_topic_search_eval_metrics
+
+    """
+    assignments = args.assignments
+    labels = args.labels
+    topic_embeddings = args.topic_embeddings
+    searcher = args.searcher
+    keywords = args.keywords
+
+    assigned_by_topic = {
+        tid: set(assignments.loc[assignments["topic_id"] == tid, "post_id"]) for tid in labels
+    }
+
+    rows = []
+    for topic_id, info in sorted(labels.items()):
+        emb = np.array(topic_embeddings[topic_id], dtype=np.float32)
+        assigned = assigned_by_topic.get(topic_id, set())
+        kws = keywords.get(topic_id, [])[:10] if keywords else []
+
+        # Next run search for evaluation
+        search_results = run_semantic_search(emb, searcher, top_k=args.eval_k)
+
+        # Display general scores
+        scores = [r["score"] for r in search_results]
+
+        eval: TopicSearchMetrics = compute_topic_search_eval_metrics(
+            args=TopicSearchMetricArgs(
+                dataset_size=args.corpus_size,
+                retrieved_ids=[r.get("post_id", "") for r in search_results],
+                topic_post_ids=assigned,
+                recall_k=DEFAULT_RECALL_K,
+                precision_k=DEFAULT_PRECISION_K,
+            )
+        )
+
+        # define the row for this topic
+        row = TopicEvalRow(
+            topic=f"{info['emoji']} {info['label']}",
+            keywords=", ".join(kws),
+            assigned_posts=len(assigned),
+            avg_search_score=np.mean(scores) if scores else 0.0,
+            **eval.model_dump(),
+        )
+        rows.append(row.model_dump())
+
+    cols = [
+        "topic",
+        "keywords",
+        "assigned_posts",
+        "avg_search_score",
+        *TopicSearchMetrics.model_fields.keys(),
+    ]
+    df = pd.DataFrame(rows)[cols]  # Ensure consistent column order
+    return df
+
+
+# Helper to join search results with topic assignments and post metadata for
+# display in the demo app. Not strictly part of evaluation, but useful for understanding results.
+def build_search_result_rows(
     results: list[dict],
     posts_by_id: dict[str, dict],
     assignments: pd.DataFrame,
@@ -34,74 +218,14 @@ def build_result_rows(
             tid = int(match.values[0])
             topic_label = id_to_label.get(tid, f"Topic {tid}")
 
-        rows.append({
-            "score": round(r.get("score", 0), 3),
-            "post": display_text,
-            "topic": topic_label,
-            "image_url": post.get("image_url", ""),
-            "post_id": pid,
-        })
+        rows.append(
+            {
+                "score": round(r.get("score", 0), 3),
+                "post": display_text,
+                "topic": topic_label,
+                "image_url": post.get("image_url", ""),
+                "post_id": pid,
+            }
+        )
 
     return rows
-
-
-def evaluate_topics(
-    labels: dict[int, dict],
-    assignments: pd.DataFrame,
-    topic_centroid_embeddings: dict[int, list[float]],
-    searcher,
-    keywords: dict[int, list[str]] | None = None,
-    top_n: int = 8,
-) -> pd.DataFrame:
-    """
-    For each topic, run a semantic search using its embedding and compute
-    precision metrics against the ground-truth topic assignments.
-
-    Search size matches the number of posts assigned to each topic (no fixed
-    cap), so match_ratio is precision@assigned_count — the fraction of assigned
-    posts that appear when the search returns exactly that many results.
-
-    Columns returned:
-      topic           — label with emoji
-      keywords        — top keywords by c-TF-IDF score, computed during BERTopic training
-      assigned_posts  — posts assigned to this topic by the model
-      results_matched — how many results belong to this topic
-      match_ratio     — results_matched / assigned_posts  (precision@assigned_count)
-      match_ratio_8   — matched in first top_n results / top_n
-      median_score    — median similarity score across all results
-      median_score_8  — median similarity score for first top_n results
-    """
-    from src.search import run_semantic_search
-
-    assigned_by_topic = {
-        tid: set(assignments.loc[assignments["topic_id"] == tid, "post_id"])
-        for tid in labels
-    }
-
-    rows = []
-    for topic_id, info in sorted(labels.items()):
-        emb = np.array(topic_centroid_embeddings[topic_id], dtype=np.float32)
-        assigned = assigned_by_topic.get(topic_id, set())
-
-        top_k = len(assigned)
-        results = run_semantic_search(emb, searcher, top_k=top_k)
-
-        scores = [r["score"] for r in results]
-        matched = [r for r in results if r.get("post_id") in assigned]
-        top_n_results = results[:top_n]
-        matched_top_n = [r for r in top_n_results if r.get("post_id") in assigned]
-
-        kws = keywords.get(topic_id, [])[:10] if keywords else []
-
-        rows.append({
-            "topic": f"{info['emoji']} {info['label']}",
-            "keywords": ", ".join(kws),
-            "assigned_posts": len(assigned),
-            "results_matched": len(matched),
-            "match_ratio": round(len(matched) / len(assigned), 3) if assigned else 0.0,
-            "match_ratio_8": round(len(matched_top_n) / top_n, 3) if top_n_results else 0.0,
-            "median_score": round(float(np.median(scores)), 3) if scores else 0.0,
-            "median_score_8": round(float(np.median([r["score"] for r in top_n_results])), 3) if top_n_results else 0.0,
-        })
-
-    return pd.DataFrame(rows)

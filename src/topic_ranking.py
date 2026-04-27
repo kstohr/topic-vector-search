@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pandas as pd
 
@@ -15,7 +15,7 @@ def rank_topics(
     def parse_ts(raw: str) -> float:
         dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
+            dt = dt.replace(tzinfo=UTC)
         return dt.timestamp()
 
     most_recent_ts = max(parse_ts(p["created_at"]) for p in posts_by_id.values())

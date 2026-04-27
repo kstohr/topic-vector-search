@@ -12,7 +12,7 @@ Usage:
 
 import json
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 POST_INDEX = Path(
@@ -29,9 +29,9 @@ MIN_TEXT_LEN = 20
 def _normalise_ts(raw: str) -> str:
     try:
         dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
-        return dt.astimezone(timezone.utc).isoformat()
+        return dt.astimezone(UTC).isoformat()
     except Exception:
-        return datetime.now(timezone.utc).isoformat()
+        return datetime.now(UTC).isoformat()
 
 
 def _is_usable(text: str) -> bool:

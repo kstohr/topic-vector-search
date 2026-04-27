@@ -1,10 +1,9 @@
 import re
-from datetime import datetime, timezone
-from typing import List, Optional
+from datetime import UTC, datetime
 
 import emoji
 import numpy as np
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sentence_transformers import SentenceTransformer
 
 from src.config import EMBEDDING_MODEL_NAME
@@ -12,43 +11,41 @@ from src.config import EMBEDDING_MODEL_NAME
 
 # Define the Pydantic model for posts
 class PostDocument(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     post_id: str
     post_author: str
     created_at: datetime
     modified_at: datetime
     post_text: str
     likes: int = 0
-    image_url: Optional[str] = None
-    image_caption: Optional[str] = None  # populated by LO5 vision exercise
-    generated_topic: Optional[str] = None
-    doc_embedding: Optional[List[float]] = Field(default_factory=list)
+    image_url: str | None = None
+    image_caption: str | None = None  # populated by LO5 vision exercise
+    generated_topic: str | None = None
+    doc_embedding: list[float] = Field(default_factory=list)
 
     @field_validator("created_at", "modified_at", mode="before")
     @classmethod
     def set_datetime_to_utc(cls, value: str) -> str:
         # Parse the datetime string, convert to UTC, and return in ISO format
         dt = datetime.fromisoformat(value)
-        if (
-            dt.tzinfo is None
-        ):  # If no timezone info, assume it's local and convert to UTC
-            dt = dt.replace(tzinfo=timezone.utc)
-        else:  # Convert to UTC if timezone info is present
-            dt = dt.astimezone(timezone.utc)
+        if dt.tzinfo is None:  # noqa: SIM108
+            dt = dt.replace(tzinfo=UTC)
+        else:
+            dt = dt.astimezone(UTC)
         return dt.isoformat()
 
-    def preprocess_text(self) -> str:
+    def preprocess_text(self, text: str | None = None) -> str:
         """
         Passed to model pipeline. Standard pre-processing of text after cleaning,
         prior to modeling. Does not include sentence splitting. If sentence
         embeddings are needed use `preprocess_sentences`.
         """
-        # Replace emojis with their textual descriptions
-        text = emoji.demojize(self.post_text)  # noqa
-        # Lowercase the text
+        if text is None:
+            text = self.post_text
+        text = emoji.demojize(text)  # noqa
         text = text.lower()
-        # Remove punctuation but preserve contractions and compound words
         text = re.sub(r"[^\w\s'-]", "", text)
-        # Remove extra whitespaces
         text = re.sub(r"\s+", " ", text).strip()
         return text
 
@@ -87,6 +84,3 @@ class PostDocument(BaseModel):
         model = SentenceTransformer(EMBEDDING_MODEL_NAME)
         embeddings = model.encode(self.preprocess_sentences())
         self.doc_embedding = np.mean(embeddings, axis=0).tolist()
-
-    class Config:
-        arbitrary_types_allowed = True

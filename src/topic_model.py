@@ -25,7 +25,6 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -36,18 +35,17 @@ from bertopic.vectorizers import ClassTfidfTransformer
 from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import CountVectorizer
 
-from src.models import PostDocument
-from src.preprocess import embedding_text
-
 from src.config import (
     ELASTICSEARCH_URL,
-    EMBEDDING_MODEL_NAME as EMBEDDING_MODEL,
-    OLLAMA_URL,
     OLLAMA_MODEL,
+    OLLAMA_URL,
     OPENAI_MODEL,
-    OUTPUT,
-    REPO,
 )
+from src.config import (
+    EMBEDDING_MODEL_NAME as EMBEDDING_MODEL,
+)
+from src.models import PostDocument
+from src.preprocess import embedding_text
 
 logger = logging.getLogger(__name__)
 
@@ -94,8 +92,8 @@ def _build_llm_representation() -> BertTopicOpenAI | None:
       2. OpenAI (OPENAI_API_KEY env var)
       3. None → KeyBERT-only labels
     """
-    from openai import OpenAI
     import httpx
+    from openai import OpenAI
 
     try:
         r = httpx.get(OLLAMA_URL.replace("/v1", "/api/tags"), timeout=2)
@@ -192,7 +190,7 @@ class TopicModeler:
 
     # ── Model training ─────────────────────────────────────────────────────
 
-    def train_topic_model(self) -> Tuple[List[int], np.ndarray]:
+    def train_topic_model(self) -> tuple[list[int], np.ndarray]:
         logger.info("Training BERTopic model.")
 
         texts, embeddings, post_ids = [], [], []
@@ -317,7 +315,7 @@ class TopicModeler:
             with open(self.output_path / "topic_embeddings.json", "w") as f:
                 json.dump({str(k): v for k, v in topic_embedding_map.items()}, f)
 
-        # topic_centroid_embeddings.json — topic centroid embeddings from top representative keywords
+        # topic_centroid_embeddings.json — centroid embeddings from top representative keywords
         topic_centroid_embs = {
             tid: self.embedding_model.encode(
                 " ".join(kws[:10]), convert_to_numpy=True

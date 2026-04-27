@@ -24,12 +24,14 @@ dependencies = [
     "Pillow>=10.0",
     "torch>=2.0,<2.3",
     "torchvision>=0.17,<0.18",
+    "ruff>=0.15.12",
 ]
 
 [dependency-groups]
 dev = [
     "ruff>=0.6.5",
     "jupyterlab>=4.2.5",
+    "pytest>=9.0.3",
 ]
 
 [build-system]
@@ -56,5 +58,26 @@ environments = [
     "sys_platform == 'win32'",
 ]
 
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
 [tool.ruff]
 line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+  "E",
+  "F",
+  "I",
+  "UP",
+  "B",
+  "SIM",
+]
+fixable = ["ALL"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
