@@ -179,19 +179,28 @@ def load_posts_by_id() -> dict[str, dict]:
 
 @st.cache_data
 def load_doc_index() -> list[dict]:
-    with open(OUTPUT / "processed_posts.json", encoding="utf-8") as f:
-        return list(json.load(f).values())
+    path = OUTPUT / "processed_posts.json"
+    if path.exists():
+        with open(path, encoding="utf-8") as f:
+            return list(json.load(f).values())
+    return load_raw_posts()
 
 
 # Displayed in evaluation view; not used by search functions themselves.
 @st.cache_data
 def load_assignments() -> pd.DataFrame:
-    return pd.read_csv(OUTPUT / "topic_assignments.csv", encoding="utf-8")
+    path = OUTPUT / "topic_assignments.csv"
+    if not path.exists():
+        return pd.DataFrame(columns=["post_id", "topic_id"])
+    return pd.read_csv(path, encoding="utf-8")
 
 
 @st.cache_data
 def load_topic_keywords() -> dict[int, list[str]]:
-    with open(OUTPUT / "bertopic_model" / "topics.json", encoding="utf-8") as f:
+    path = OUTPUT / "bertopic_model" / "topics.json"
+    if not path.exists():
+        return {}
+    with open(path, encoding="utf-8") as f:
         data = json.load(f)
     reps = data.get("topic_representations", {})
     return {int(k): [w for w, _ in v] for k, v in reps.items() if int(k) != -1}
@@ -199,7 +208,10 @@ def load_topic_keywords() -> dict[int, list[str]]:
 
 @st.cache_data
 def load_topic_labels() -> dict[int, dict]:
-    with open(OUTPUT / "topic_labels.json", encoding="utf-8") as f:
+    path = OUTPUT / "topic_labels.json"
+    if not path.exists():
+        return {}
+    with open(path, encoding="utf-8") as f:
         return {int(k): v for k, v in json.load(f).items()}
 
 
@@ -215,13 +227,19 @@ def build_topic_searcher(engine: str):
 
 @st.cache_data
 def load_topic_centroid_embeddings() -> dict[int, list[float]]:
-    with open(OUTPUT / "topic_centroid_embeddings.json", encoding="utf-8") as f:
+    path = OUTPUT / "topic_centroid_embeddings.json"
+    if not path.exists():
+        return {}
+    with open(path, encoding="utf-8") as f:
         return {int(k): v for k, v in json.load(f).items()}
 
 
 @st.cache_data
 def load_topic_embeddings() -> dict[int, list[float]]:
-    with open(OUTPUT / "topic_embeddings.json", encoding="utf-8") as f:
+    path = OUTPUT / "topic_embeddings.json"
+    if not path.exists():
+        return {}
+    with open(path, encoding="utf-8") as f:
         return {int(k): v for k, v in json.load(f).items()}
 
 
