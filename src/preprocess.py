@@ -14,21 +14,19 @@ Steps:
 
 import json
 import logging
-from pathlib import Path
 from typing import Any
 
 from elasticsearch import Elasticsearch
 from sentence_transformers import SentenceTransformer
 
-from src.models import PostDocument
 from src.config import (
     ELASTICSEARCH_URL,
-    EMBEDDING_DIMENSION,
     EMBEDDING_MODEL_NAME,
     OUTPUT,
     REPO,
     VISION_MODEL_NAME,
 )
+from src.models import PostDocument
 
 logger = logging.getLogger(__name__)
 
@@ -117,8 +115,8 @@ def generate_embeddings(posts: list[dict], model: SentenceTransformer) -> list[d
     without one (their old embedding was based on empty text).
     """
     for p in posts:
-        if p.get("image_url") and p.get("image_caption") and p.get("doc_embedding"):
-            if not p.get("post_text", "").strip():
+        has_image_caption = p.get("image_url") and p.get("image_caption") and p.get("doc_embedding")
+        if has_image_caption and not p.get("post_text", "").strip():
                 p["doc_embedding"] = []  # force re-embed with caption text
 
     needs = [p for p in posts if not p.get("doc_embedding")]
@@ -130,7 +128,7 @@ def generate_embeddings(posts: list[dict], model: SentenceTransformer) -> list[d
     texts = [embedding_text(p) for p in needs]
     embeddings = model.encode(texts, batch_size=32, show_progress_bar=True,
                               convert_to_numpy=True)
-    for p, emb in zip(needs, embeddings):
+    for p, emb in zip(needs, embeddings, strict=True):
         p["doc_embedding"] = emb.tolist()
 
     return posts
@@ -147,7 +145,9 @@ def _try_elasticsearch_client() -> Elasticsearch | None:
         return None
 
 
-def save_to_elasticsearch(posts: list[dict], client: Elasticsearch, index_name: str = "post_docs") -> None:
+def save_to_elasticsearch(
+    posts: list[dict], client: Elasticsearch, index_name: str = "post_docs"
+) -> None:
     from src.index import INDEX_NAME, create_index
 
     create_index(client)

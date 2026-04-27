@@ -4,20 +4,19 @@ Generate posts on six (7) example topics.
 
 import json
 import logging
-import os
 import random
 import uuid
 from datetime import datetime, timedelta
 
 from openai import OpenAI
 
+from src.config import OLLAMA_MODEL, OLLAMA_URL
+
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 RANDOM_SEED = 99
-
-from src.config import OLLAMA_URL, OLLAMA_MODEL
 
 client = OpenAI(base_url=OLLAMA_URL, api_key="ollama")
 
@@ -153,7 +152,7 @@ def generate_posts_list(topic, keywords):
         messages=[
             {
                 "role": "system",
-                "content": "You are a helpful assistant that generates creative social media posts.",
+                "content": "You are a helpful assistant that generates creative social media posts.",  # noqa: E501
             },
             {"role": "user", "content": prompt},
         ],
@@ -199,7 +198,7 @@ def main():
     engaging.
     - Do not repeat the content of posts.
     - Vary the topic of the posts so that they are on random and distinct topics.
-    (e.g., food, art, culture, travel, sports, self-help, technology, history, science, geology, etc.)
+    (e.g., food, art, culture, travel, sports, technology, history, science, etc.)
     - Some posts can emulate short responses to other posts not included in the list.
     - Vary the length of posts from 1 sentence to 5 sentences.
     - Vary the tone of the posts from serious to lighthearted

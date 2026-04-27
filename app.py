@@ -15,8 +15,7 @@ import base64
 import hashlib
 import html
 import json
-import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np
@@ -24,8 +23,25 @@ import pandas as pd
 import streamlit as st
 
 from src.config import ELASTICSEARCH_URL
-from src.search import get_searcher, get_topic_searcher, get_searcher_label, run_keyword_search, run_semantic_search, TEXT_SEARCH_ENGINES, TOPIC_SEARCH_ENGINES, _SEARCHER_LABELS
-from src.evaluation import build_result_rows, evaluate_topics  # noqa: E402
+from src.evaluation import (
+    DEFAULT_EVAL_K,
+    DEFAULT_PRECISION_K,
+    DEFAULT_RECALL_K,
+    TopicEvalArgs,
+    build_search_result_rows,
+    evaluate_topics,
+)
+from src.search import (
+    _SEARCHER_LABELS,
+    TEXT_SEARCH_ENGINES,
+    TOP_K_DEFAULT,
+    TOPIC_SEARCH_ENGINES,
+    get_searcher,
+    get_searcher_label,
+    get_topic_searcher,
+    run_keyword_search,
+    run_semantic_search,
+)
 from src.topic_ranking import rank_topics  # noqa: E402
 
 OUTPUT = Path(__file__).parent / "output"
@@ -33,7 +49,8 @@ REPO = Path(__file__).parent
 
 st.set_page_config(page_title="Topic Vector Search", layout="wide")
 
-st.markdown("""
+st.markdown(
+    """
 <style>
 .button_style {
     background-color: #8B6FD4;
@@ -107,16 +124,19 @@ st.markdown("""
     color: #bbb; white-space: nowrap;
 }
 </style>
-""", unsafe_allow_html=True)
-
+""",
+    unsafe_allow_html=True,
+)
 
 
 # ── Startup: index posts into Elasticsearch ────────────────────────────────
+
 
 @st.cache_resource
 def _startup_index_posts() -> str:
     """Index posts from sample_posts.json into Elasticsearch on first run."""
     from elasticsearch import Elasticsearch
+
     from src.index import INDEX_NAME, create_index
 
     try:
@@ -145,6 +165,7 @@ _startup_index_posts()
 
 # ── Data loading (all cached) ───────────────────────────────────────────────
 
+
 @st.cache_data
 def load_raw_posts() -> list[dict]:
     with open(REPO / "sample_posts.json", encoding="utf-8") as f:
@@ -162,7 +183,7 @@ def load_doc_index() -> list[dict]:
         return list(json.load(f).values())
 
 
-# Displayed for informational purposes in "evaluation view" when running searches; not used by the search functions themselves.
+# Displayed in evaluation view; not used by search functions themselves.
 @st.cache_data
 def load_assignments() -> pd.DataFrame:
     return pd.read_csv(OUTPUT / "topic_assignments.csv", encoding="utf-8")
@@ -183,7 +204,6 @@ def load_topic_labels() -> dict[int, dict]:
 
 
 @st.cache_resource
-@st.cache_resource
 def build_searcher(engine: str):
     return get_searcher(load_doc_index(), engine)
 
@@ -191,7 +211,6 @@ def build_searcher(engine: str):
 @st.cache_resource
 def build_topic_searcher(engine: str):
     return get_topic_searcher(load_doc_index(), engine)
-
 
 
 @st.cache_data
@@ -215,7 +234,8 @@ def get_trending() -> list[dict]:
 
 # ── Search helpers ──────────────────────────────────────────────────────────
 
-def _search_by_text(query: str, top_k: int | None = None) -> list[dict]:
+
+def _search_by_text(query: str, top_k: int) -> list[dict]:
     """Text search from the search bar. Works with all four searchers in get_searcher()."""
     return run_keyword_search(query, build_searcher(text_engine), top_k=top_k)
 
@@ -226,13 +246,14 @@ def _topic_embeddings() -> dict[int, list[float]]:
     return load_topic_embeddings()
 
 
-def _search_by_topic(topic_id: int, top_k: int | None = None) -> list[dict]:
+def _search_by_topic(topic_id: int, top_k: int) -> list[dict]:
     """Topic embedding search. Always uses get_topic_searcher() — a semantic searcher."""
     emb = np.array(_topic_embeddings()[topic_id], dtype=np.float32)
     return run_semantic_search(emb, build_topic_searcher(topic_engine), top_k=top_k)
 
 
 # ── Image helper ────────────────────────────────────────────────────────────
+
 
 @st.cache_data
 def _image_uri(image_url: str) -> str:
@@ -250,8 +271,14 @@ def _image_uri(image_url: str) -> str:
 # ── Feed rendering ──────────────────────────────────────────────────────────
 
 _AVATAR_COLORS = [
-    "#5B8DEF", "#8B6FD4", "#E8685A", "#3CB47A",
-    "#E8984A", "#4EC5C1", "#D46F96", "#7AAB58",
+    "#5B8DEF",
+    "#8B6FD4",
+    "#E8685A",
+    "#3CB47A",
+    "#E8984A",
+    "#4EC5C1",
+    "#D46F96",
+    "#7AAB58",
 ]
 
 
@@ -271,8 +298,8 @@ def _rel_time(dt_str: str) -> str:
     try:
         dt = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        days = (datetime.now(timezone.utc) - dt).days
+            dt = dt.replace(tzinfo=UTC)
+        days = (datetime.now(UTC) - dt).days
         if days < 1:
             return "today"
         if days < 7:
@@ -339,7 +366,7 @@ def render_feed(results: list[dict]) -> None:
 
 
 def render_results_eval(results: list[dict]) -> None:
-    rows = build_result_rows(
+    rows = build_search_result_rows(
         results, load_posts_by_id(), load_assignments(), load_topic_labels()
     )
     for row in rows:
@@ -350,13 +377,24 @@ def render_results_eval(results: list[dict]) -> None:
 
     df = pd.DataFrame(rows)
     col_cfg = {
-        "score": st.column_config.NumberColumn("Score", format="%.3f", width="small", help="The search score for this post, normalized to [0, 1] for easier comparison across search engines."),
-        "post":  st.column_config.TextColumn("Post", width="large", help="The text content of the post."),
-        "topic": st.column_config.TextColumn("Topic", width="medium", help="The topic label assigned by BERTopic, if available."),
+        "score": st.column_config.NumberColumn(
+            "Score",
+            format="%.3f",
+            width="small",
+            help="Search score, normalized to [0, 1] for easier comparison across engines.",
+        ),
+        "post": st.column_config.TextColumn(
+            "Post", width="large", help="The text content of the post."
+        ),
+        "topic": st.column_config.TextColumn(
+            "Topic", width="medium", help="The topic label assigned by BERTopic, if available."
+        ),
     }
     if "image" in df.columns:
-        col_cfg["image"] = st.column_config.ImageColumn("Image", width="small", help="The image associated with the post, if available.")
-    st.dataframe(df, width='stretch', column_config=col_cfg, hide_index=True)
+        col_cfg["image"] = st.column_config.ImageColumn(
+            "Image", width="small", help="The image associated with the post, if available."
+        )
+    st.dataframe(df, width="stretch", column_config=col_cfg, hide_index=True)
 
 
 # ── Session state ───────────────────────────────────────────────────────────
@@ -375,12 +413,13 @@ if "show_topic_eval" not in st.session_state:
     st.session_state.show_topic_eval = False
 if "use_topic_centroid_embeddings" not in st.session_state:
     st.session_state.use_topic_centroid_embeddings = False
+if "eval_selected_topic_id" not in st.session_state:
+    st.session_state.eval_selected_topic_id = None
 
 # Clear the search widget before it is instantiated (cannot be set after render)
 if st.session_state._clear_search:
     st.session_state.search_input = ""
     st.session_state._clear_search = False
-
 
 
 # ── Layout ──────────────────────────────────────────────────────────────────
@@ -389,13 +428,15 @@ with st.sidebar:
     st.header("Demo App Controls")
 
     st.caption("Clear the cache to pick up source code or data changes.")
-    if st.button("Clear cache", width='stretch'):
+    if st.button("Clear cache", width="stretch"):
         st.cache_data.clear()
         st.cache_resource.clear()
         st.rerun()
 
     st.header("Search Controls")
-    st.caption("Select which search engine to use for the search bar and topic search. Changes will apply on next search.")
+    st.caption(
+        "Select search engine for the search bar and topic search. Changes apply on next search."
+    )
 
     text_engine = st.radio(
         "Search bar engine",
@@ -413,28 +454,39 @@ with st.sidebar:
     def _on_topic_eval_toggle():
         st.session_state.show_topic_eval = not st.session_state.show_topic_eval
         st.session_state.active_topic = None
+        st.session_state.eval_selected_topic_id = None
         st.session_state.keyword_query = ""
         st.session_state._clear_search = True
 
+    st.toggle(
+        "Evaluate search results",
+        value=st.session_state.eval_view,
+        key="eval_view_sidebar",
+        on_change=lambda: setattr(st.session_state, "eval_view", not st.session_state.eval_view),
+    )
 
-    st.toggle("Evaluate search results", value=st.session_state.eval_view, key="eval_view_sidebar",
-              on_change=lambda: setattr(st.session_state, "eval_view", not st.session_state.eval_view))
-
-    st.toggle("Evaluate topics", value=st.session_state.show_topic_eval, on_change=_on_topic_eval_toggle)
+    st.toggle(
+        "Evaluate topics", value=st.session_state.show_topic_eval, on_change=_on_topic_eval_toggle
+    )
 
     st.toggle(
         "Use topic centroid embeddings",
         key="use_topic_centroid_embeddings",
-        help="On: topic centroid embeddings — derived from top representative keywords (topic_centroid_embeddings.json). Off: topic embeddings — mean of document embeddings assigned to the topic (topic_embeddings.json).",
+        help=(
+            "On: centroid of top keywords (topic_centroid_embeddings.json). "
+            "Off: mean of assigned doc embeddings (topic_embeddings.json)."
+        ),
     )
 
 st.title("Topic Vector Search")
+
 
 # — Search bar —
 def _on_search_change():
     st.session_state.keyword_query = st.session_state.search_input
     st.session_state.active_topic = None
     st.session_state.show_topic_eval = False
+
 
 st.text_input(
     label="search",
@@ -451,16 +503,19 @@ st.subheader("Trending")
 
 trending = get_trending()
 cols = st.columns(3)
-for col, topic in zip(cols, trending):
+for col, topic in zip(cols, trending, strict=False):
     with col:
         kw_str = " · ".join(topic["keywords"])
-        st.markdown(f"""
+        st.markdown(
+            f"""
 <div class="topic-card">
-  <div class="topic-emoji">{topic['emoji']}</div>
-  <div class="topic-label">{topic['label']}</div>
-  <div class="topic-stat">❤️ {topic['total_likes']:,} likes &nbsp;·&nbsp; {topic['post_count']} posts</div>
+  <div class="topic-emoji">{topic["emoji"]}</div>
+  <div class="topic-label">{topic["label"]}</div>
+  <div class="topic-stat">❤️ {topic["total_likes"]:,} likes · {topic["post_count"]} posts</div>
   <div class="topic-kw">{kw_str}</div>
-</div>""", unsafe_allow_html=True)
+</div>""",
+            unsafe_allow_html=True,
+        )
         if st.button("Search this topic", key=f"btn_{topic['topic_id']}"):
             st.session_state.active_topic = topic["topic_id"]
             st.session_state.keyword_query = ""
@@ -470,45 +525,110 @@ for col, topic in zip(cols, trending):
 
 if st.session_state.show_topic_eval:
     with st.spinner("Evaluating topics…"):
-        eval_df = evaluate_topics(
-            load_topic_labels(),
-            load_assignments(),
-            _topic_embeddings(),
-            build_topic_searcher(topic_engine),
-            keywords=load_topic_keywords(),
+        labels = load_topic_labels()
+        eval_df: pd.DataFrame = evaluate_topics(
+            TopicEvalArgs(
+                corpus_size=len(load_posts_by_id()),
+                labels=labels,
+                assignments=load_assignments(),
+                topic_embeddings=_topic_embeddings(),
+                searcher=build_topic_searcher(topic_engine),
+                keywords=load_topic_keywords(),
+            )
         )
 
-    labels = load_topic_labels()
     topic_ids = sorted(labels.keys())
 
     selection = st.dataframe(
         eval_df,
-        width='stretch',
+        width="stretch",
         hide_index=True,
         on_select="rerun",
         selection_mode="single-row",
         column_config={
-            "topic":          st.column_config.TextColumn("Topic", width="medium", help="The topic label assigned by BERTopic, if available."),
-            "keywords":       st.column_config.TextColumn("Keywords", width="large", help="Top keywords by c-TF-IDF score, computed during BERTopic training."),
-            "assigned_posts": st.column_config.NumberColumn("Assigned", width="small", help="Count of posts assigned to this topic based on BERTopic clustering."),
-            "results_matched":st.column_config.NumberColumn("Matched", width="small", help="Count of assigned posts returned when searching with exactly as many results as posts assigned to this topic."),
-            "match_ratio":    st.column_config.NumberColumn("Match Ratio", format="%.3f", width="small", help="Precision@assigned_count — matched / assigned_posts. Search size equals the number of posts assigned to each topic, so the ratio is not capped by a fixed top-k."),
-            "match_ratio_8":  st.column_config.NumberColumn("Match Ratio @8", format="%.3f", width="small", help="Proportion of assigned posts that appear in the top 8 search results for the topic embedding."),  # noqa
-            "median_score":   st.column_config.NumberColumn("Median Search Score", format="%.3f", width="small", help="Median search score of the assigned posts that appear in the search results for the topic embedding."),
-            "median_score_8": st.column_config.NumberColumn("Median Search Score @8", format="%.3f", width="small", help="Median search score of the assigned posts that appear in the top 8 search results for the topic embedding."),  # noqa
+            "topic": st.column_config.TextColumn(
+                "Topic", width="medium", help="The topic label assigned by BERTopic, if available."
+            ),
+            "keywords": st.column_config.TextColumn(
+                "Keywords",
+                width="large",
+                help="Top keywords by c-TF-IDF score, computed during BERTopic training.",
+            ),
+            "assigned_posts": st.column_config.NumberColumn(
+                "Assigned",
+                width="small",
+                help="Count of posts assigned to this topic based on BERTopic clustering.",
+            ),
+            "avg_search_score": st.column_config.NumberColumn(
+                "Avg Search Score",
+                format="%.3f",
+                width="small",
+                help="Average semantic search score across the evaluation search results.",
+            ),
+            "precision_at_k": st.column_config.NumberColumn(
+                f"Precision@{DEFAULT_PRECISION_K}",
+                format="%.3f",
+                width="small",
+                help=(
+                    f"Quality of the top {DEFAULT_PRECISION_K} search results: "
+                    "precision_hits / precision_k."
+                ),
+            ),
+            "recall_at_k": st.column_config.NumberColumn(
+                f"Recall@{DEFAULT_RECALL_K}",
+                format="%.3f",
+                width="small",
+                help=(
+                    f"Coverage of the topic within the top {DEFAULT_RECALL_K} search results: "
+                    "recall_hits / assigned topic posts."
+                ),
+            ),
+            "baseline": st.column_config.NumberColumn(
+                "Random Baseline",
+                format="%.3f",
+                width="small",
+                help="Expected precision from randomly selecting posts from the full corpus.",
+            ),
+            "num_posts_assigned_to_topic": st.column_config.NumberColumn(
+                "Topic Posts",
+                width="small",
+                help="Posts assigned to this topic by BERTopic.",
+            ),
+            "num_retrieved_by_search": st.column_config.NumberColumn(
+                "Retrieved",
+                width="small",
+                help=f"Results returned for evaluation (up to eval_k={DEFAULT_EVAL_K}).",
+            ),
+            "precision_hits": st.column_config.NumberColumn(
+                "Precision Hits",
+                width="small",
+                help=f"Assigned topic posts found in the top {DEFAULT_PRECISION_K} results.",
+            ),
+            "recall_hits": st.column_config.NumberColumn(
+                "Recall Hits",
+                width="small",
+                help=f"Assigned topic posts found in the top {DEFAULT_RECALL_K} results.",
+            ),
         },
     )
 
     selected_rows = selection.selection.rows if selection else []
     if selected_rows:
-        row_idx = selected_rows[0]
-        selected_topic_id = topic_ids[row_idx]
-        info = labels[selected_topic_id]
-        results = _search_by_topic(selected_topic_id)
+        st.session_state.eval_selected_topic_id = topic_ids[selected_rows[0]]
 
-        embedding_strategy = "Topic centroid embedding" if st.session_state.use_topic_centroid_embeddings else "Topic embedding"
+    active_eval_topic = st.session_state.eval_selected_topic_id
+    if active_eval_topic is not None:
+        info = labels[active_eval_topic]
+        results = _search_by_topic(active_eval_topic, top_k=DEFAULT_EVAL_K)
+
+        embedding_strategy = (
+            "Topic centroid embedding"
+            if st.session_state.use_topic_centroid_embeddings
+            else "Topic embedding"
+        )
         st.subheader(f"Results for {info['emoji']} {info['label']}")
-        st.caption(f"Search engine: {get_searcher_label(build_topic_searcher(topic_engine))} · Embedding: {embedding_strategy}")
+        engine_label = get_searcher_label(build_topic_searcher(topic_engine))
+        st.caption(f"Search engine: {engine_label} · Embedding: {embedding_strategy}")
 
         if st.session_state.eval_view:
             render_results_eval(results)
@@ -518,7 +638,9 @@ if st.session_state.show_topic_eval:
 st.markdown("---")
 
 # — Results header + view toggle —
-if not st.session_state.show_topic_eval and (st.session_state.active_topic is not None or st.session_state.keyword_query.strip()):
+if not st.session_state.show_topic_eval and (
+    st.session_state.active_topic is not None or st.session_state.keyword_query.strip()
+):
     topic_id = st.session_state.active_topic
     query = st.session_state.keyword_query.strip()
 
@@ -528,16 +650,21 @@ if not st.session_state.show_topic_eval and (st.session_state.active_topic is no
         label = f"{info.get('emoji', '')} {info.get('label', f'Topic {topic_id}')}"
         header_text = f"Results for {label}"
         with st.spinner("Searching…"):
-            results = _search_by_topic(topic_id)
+            results = _search_by_topic(topic_id, top_k=TOP_K_DEFAULT)
     else:
         header_text = f'Results for "{query}"'
         with st.spinner("Searching…"):
-            results = _search_by_text(query)
+            results = _search_by_text(query, top_k=TOP_K_DEFAULT)
 
     st.subheader(header_text)
     if topic_id is not None:
-        embedding_strategy = "Topic centroid embedding" if st.session_state.use_topic_centroid_embeddings else "Topic embedding"
-        st.caption(f"Search engine: {get_searcher_label(build_topic_searcher(topic_engine))} · Embedding: {embedding_strategy}")
+        embedding_strategy = (
+            "Topic centroid embedding"
+            if st.session_state.use_topic_centroid_embeddings
+            else "Topic embedding"
+        )
+        engine_label = get_searcher_label(build_topic_searcher(topic_engine))
+        st.caption(f"Search engine: {engine_label} · Embedding: {embedding_strategy}")
     else:
         st.caption(f"Search engine: {get_searcher_label(build_searcher(text_engine))}")
 

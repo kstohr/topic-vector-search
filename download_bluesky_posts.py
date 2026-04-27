@@ -17,7 +17,7 @@ import json
 import random
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 MIN_TEXT_LEN = 30
@@ -47,14 +47,14 @@ def _is_usable(post: dict) -> bool:
 
 def _to_post_doc(post: dict) -> dict:
     uri = post.get("uri", "")
-    created_raw = post.get("created_at") or datetime.now(timezone.utc).isoformat()
+    created_raw = post.get("created_at") or datetime.now(UTC).isoformat()
 
     # Normalise timestamp to UTC ISO string
     try:
         dt = datetime.fromisoformat(created_raw.replace("Z", "+00:00"))
-        created_iso = dt.astimezone(timezone.utc).isoformat()
+        created_iso = dt.astimezone(UTC).isoformat()
     except Exception:
-        created_iso = datetime.now(timezone.utc).isoformat()
+        created_iso = datetime.now(UTC).isoformat()
 
     return {
         "post_id": str(uuid.uuid5(uuid.NAMESPACE_URL, uri)) if uri else str(uuid.uuid4()),
