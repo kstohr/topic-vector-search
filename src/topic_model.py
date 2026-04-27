@@ -9,7 +9,7 @@ trains BERTopic, and writes all output artifacts:
   output/bertopic_model/
   output/topic_assignments.csv
   output/topic_labels.json
-  output/topic_centroid_embeddings.json
+  output/topic_keyword_embeddings.json
   output/topics.json
   output/probabilities.json
   output/topic_visualization.html  (and other BERTopic charts)
@@ -315,15 +315,15 @@ class TopicModeler:
             with open(self.output_path / "topic_embeddings.json", "w") as f:
                 json.dump({str(k): v for k, v in topic_embedding_map.items()}, f)
 
-        # topic_centroid_embeddings.json — centroid embeddings from top representative keywords
-        topic_centroid_embs = {
+        # topic_keyword_embeddings.json — embeddings derived from top representative keywords
+        topic_keyword_embs = {
             tid: self.embedding_model.encode(
                 " ".join(kws[:10]), convert_to_numpy=True
             ).tolist()
             for tid, kws in keywords_by_topic.items()
         }
-        with open(self.output_path / "topic_centroid_embeddings.json", "w") as f:
-            json.dump({str(k): v for k, v in topic_centroid_embs.items()}, f)
+        with open(self.output_path / "topic_keyword_embeddings.json", "w") as f:
+            json.dump({str(k): v for k, v in topic_keyword_embs.items()}, f)
 
         logger.info(f"All artifacts saved to {self.output_path}/")
 
