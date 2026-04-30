@@ -6,11 +6,13 @@ import pytest
 from src.search import (
     InMemoryKeywordSearcher,
     InMemorySemanticSearcher,
+    TextSearchArgs,
+    TopicSearchArgs,
     get_searcher,
     get_searcher_label,
     get_topic_searcher,
-    run_keyword_search,
-    run_semantic_search,
+    run_search_by_text,
+    run_search_by_topic,
 )
 
 SAMPLE_POSTS = [
@@ -151,21 +153,21 @@ class TestGetSearcherLabel:
 
 class TestRunKeywordSearch:
     def test_uses_keyword_searcher(self, keyword_searcher):
-        results = run_keyword_search("Python", keyword_searcher)
+        results = run_search_by_text(TextSearchArgs(query="Python", searcher=keyword_searcher))
         assert len(results) == 2
 
     def test_uses_embedding_when_searcher_has_model(self, semantic_searcher):
-        results = run_keyword_search("Python", semantic_searcher)
+        results = run_search_by_text(TextSearchArgs(query="Python", searcher=semantic_searcher))
         assert isinstance(results, list)
 
 
 class TestRunSemanticSearch:
     def test_returns_results(self, semantic_searcher):
         embedding = np.array([1.0, 0.0, 0.0])
-        results = run_semantic_search(embedding, semantic_searcher)
+        results = run_search_by_topic(TopicSearchArgs(embedding=embedding, searcher=semantic_searcher))
         assert len(results) > 0
 
     def test_raises_when_searcher_lacks_embedding_model(self, keyword_searcher):
         embedding = np.array([1.0, 0.0, 0.0])
         with pytest.raises(TypeError):
-            run_semantic_search(embedding, keyword_searcher)
+            run_search_by_topic(TopicSearchArgs(embedding=embedding, searcher=keyword_searcher))

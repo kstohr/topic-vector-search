@@ -1,8 +1,11 @@
+"""End-to-end pipeline: preprocessing → topic modeling."""
+
 from src.preprocess import run as preprocess_run
 from src.topic_model import TopicModeler
 
 
 def pipeline():
+    """Run preprocessing then topic modeling in sequence."""
     print("Running preprocessing pipeline...")
     preprocess_run()
     print("Preprocessing complete.\n")

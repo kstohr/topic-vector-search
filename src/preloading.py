@@ -1,20 +1,4 @@
-"""
-Workshop pre-loading script: index posts into Elasticsearch for keyword search.
-
-Run this before the workshop so attendees can test BM25 keyword search
-without needing to run the full embedding pipeline first.
-
-Run:
-    uv run python -m src.preloading
-
-What it does:
-  1. Connects to Elasticsearch at ELASTICSEARCH_URL (default localhost:9201)
-  3. Bulk-indexes all posts from sample_posts.json
-
-After this runs, the Elasticsearch-backed KeywordSearcher and the
-in-memory InMemoryKeywordSearcher both work in the demo app.
-Run src/preprocess.py to add embeddings and unlock semantic search.
-"""
+"""Workshop pre-loading: index raw posts into Elasticsearch for keyword search."""
 
 import json
 import logging
@@ -23,7 +7,7 @@ from pathlib import Path
 from elasticsearch import Elasticsearch, helpers
 
 from src.config import ELASTICSEARCH_URL, REPO
-from src.index import INDEX_NAME, create_index
+from src.es_index import INDEX_NAME, create_index
 from src.models import PostDocument
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
@@ -31,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def load_posts(path: Path) -> list[PostDocument]:
+    """Load and validate posts from a JSON file."""
     with open(path) as f:
         raw = json.load(f)
     posts = [PostDocument(**p) for p in raw]
@@ -39,6 +24,7 @@ def load_posts(path: Path) -> list[PostDocument]:
 
 
 def index_posts(client: Elasticsearch, posts: list[PostDocument]) -> None:
+    """Bulk-index posts into Elasticsearch."""
     actions = [
         {
             "_index": INDEX_NAME,
@@ -54,6 +40,7 @@ def index_posts(client: Elasticsearch, posts: list[PostDocument]) -> None:
 
 
 def run() -> None:
+    """Connect to Elasticsearch, create the index, and load all posts."""
     client = Elasticsearch(ELASTICSEARCH_URL)
     try:
         client.info()

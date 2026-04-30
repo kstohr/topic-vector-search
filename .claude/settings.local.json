@@ -1,10 +1,24 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(git -C /Users/kas/dev/pycon_2026/topic-vector-search branch --show-current)",
-      "Bash(git -C /Users/kas/dev/pycon_2026/topic-vector-search status --short)",
-      "Bash(git *)",
-      "Bash(uv run *)"
-    ]
+  {
+    "attribution": {
+      "commit": "",
+      "pr": ""
+    },
+    "permissions": {
+      "allow": [
+        "Bash(uv run *)",
+        "Bash(ruff check *)",
+        "Bash(python *)",
+        "Bash(git status*)",
+        "Bash(git log*)",
+        "Bash(git diff*)",
+        "Bash(git show*)",
+        "Bash(git branch*)",
+        "Bash(git fetch*)",
+        "Bash(git remote*)"
+      ],
+      "deny": [
+        "Bash(git commit*)",
+        "Bash(git merge*)"
+      ]
+    }
   }
-}

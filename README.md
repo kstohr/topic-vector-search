@@ -134,6 +134,15 @@ OPENAI_PROJECT="proj_..."       # enterprise/team only
 
 ---
 
+## Known Issues
+
+**`Exception ignored in: ResourceTracker.__del__`** — you may see this message
+in the terminal after running `uv run python -m src.topic_model`. It is a
+[known bug](https://github.com/uqfoundation/multiprocess/issues) in
+`multiprocess` It can be ignored.
+
+---
+
 ## Requirements
 
 - Python 3.12+

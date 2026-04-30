@@ -1,3 +1,5 @@
+"""Pydantic models for raw posts (Post) and processed post documents (PostDocument)."""
+
 import re
 from datetime import UTC, datetime
 
@@ -9,9 +11,8 @@ from sentence_transformers import SentenceTransformer
 from src.config import EMBEDDING_MODEL_NAME
 
 
-# Define the Pydantic model for posts
-class PostDocument(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+class Post(BaseModel):
+    """Raw, unprocessed social media post as generated or ingested."""
 
     post_id: str
     post_author: str
@@ -20,14 +21,12 @@ class PostDocument(BaseModel):
     post_text: str
     likes: int = 0
     image_url: str | None = None
-    image_caption: str | None = None  # populated by LO5 vision exercise
     generated_topic: str | None = None
-    doc_embedding: list[float] = Field(default_factory=list)
 
     @field_validator("created_at", "modified_at", mode="before")
     @classmethod
     def set_datetime_to_utc(cls, value: str) -> str:
-        # Parse the datetime string, convert to UTC, and return in ISO format
+        """Normalise datetime strings to UTC ISO format."""
         dt = datetime.fromisoformat(value)
         if dt.tzinfo is None:  # noqa: SIM108
             dt = dt.replace(tzinfo=UTC)
@@ -49,6 +48,7 @@ class PostDocument(BaseModel):
         text = re.sub(r"\s+", " ", text).strip()
         return text
 
+    # Commented out due to SpaCy dependency
     # async def preprocess_sentences(self) -> list[str]:
     #     """
     #     Splits the text into sentences. Pre-processes each sentence. Returns a list
@@ -71,16 +71,15 @@ class PostDocument(BaseModel):
         by lowercasing, removing numbers, extra whitespaces, and replacing emojis
         with their textual descriptions.
         """
-
-        # Split text into sentences using regex (matches periods, exclamations, and questions)
         split_text = re.split(r"(?<=[.!?])\s+", self.post_text)
-
-        # Apply preprocessing to each sentence
         sentences = [self.preprocess_text(sent) for sent in split_text if sent.strip()]
         return sentences
 
-    # Create embeddings using SentenceTransformers and store them in the txt_embedding field
-    def create_embeddings(self) -> None:
-        model = SentenceTransformer(EMBEDDING_MODEL_NAME)
-        embeddings = model.encode(self.preprocess_sentences())
-        self.doc_embedding = np.mean(embeddings, axis=0).tolist()
+
+class PostDocument(Post):
+    """Processed post document with image caption and embedding populated by preprocess.py."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    image_caption: str | None = None
+    doc_embedding: list[float] = Field(default_factory=list)

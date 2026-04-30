@@ -1,6 +1,12 @@
+"""Elasticsearch index definition and lifecycle helpers for post_docs."""
+
+import logging
+
 from elasticsearch import Elasticsearch
 
 from src.config import ELASTICSEARCH_URL
+
+logger = logging.getLogger(__name__)
 
 INDEX_NAME = "post_docs"
 INDEX_BODY = {
@@ -24,20 +30,23 @@ INDEX_BODY = {
 
 
 def get_client() -> Elasticsearch:
+    """Return a new Elasticsearch client using the configured URL."""
     return Elasticsearch(ELASTICSEARCH_URL)
 
 
 def create_index(client: Elasticsearch) -> None:
+    """Create the post_docs index if it does not already exist."""
     if not client.indices.exists(index=INDEX_NAME):
         client.indices.create(index=INDEX_NAME, body=INDEX_BODY)
-        print(f"Index '{INDEX_NAME}' created successfully.")
+        logger.info(f"Index '{INDEX_NAME}' created successfully.")
     else:
-        print(f"Index '{INDEX_NAME}' already exists.")
+        logger.info(f"Index '{INDEX_NAME}' already exists.")
 
 
 def delete_index(client: Elasticsearch) -> None:
+    """Delete the post_docs index if it exists."""
     if client.indices.exists(index=INDEX_NAME):
         client.indices.delete(index=INDEX_NAME)
-        print(f"Index '{INDEX_NAME}' deleted successfully.")
+        logger.info(f"Index '{INDEX_NAME}' deleted successfully.")
     else:
-        print(f"Index '{INDEX_NAME}' does not exist.")
+        logger.info(f"Index '{INDEX_NAME}' does not exist.")

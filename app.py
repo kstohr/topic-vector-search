@@ -27,6 +27,8 @@ from src.evaluation import (
     DEFAULT_EVAL_K,
     DEFAULT_PRECISION_K,
     DEFAULT_RECALL_K,
+    SearchResultRow,
+    SearchResultRowsArgs,
     TopicEvalArgs,
     build_search_result_rows,
     evaluate_topics,
@@ -36,13 +38,15 @@ from src.search import (
     TEXT_SEARCH_ENGINES,
     TOP_K_DEFAULT,
     TOPIC_SEARCH_ENGINES,
+    TextSearchArgs,
+    TopicSearchArgs,
     get_searcher,
     get_searcher_label,
     get_topic_searcher,
-    run_keyword_search,
-    run_semantic_search,
+    run_search_by_text,
+    run_search_by_topic,
 )
-from src.topic_ranking import rank_topics  # noqa: E402
+from src.topic_ranking import TopicRankingArgs, TrendingTopic, rank_topics
 
 OUTPUT = Path(__file__).parent / "output"
 REPO = Path(__file__).parent
@@ -67,7 +71,6 @@ st.markdown(
     border: 1px solid #e0e0e0; border-radius: 10px;
     padding: 16px; text-align: center;
 }
-.topic-emoji  { font-size: 2rem; }
 .topic-label  { font-weight: 600; margin: 6px 0 4px; }
 .topic-stat   { color: #666; font-size: 0.85rem; }
 .topic-kw     { color: #999; font-size: 0.75rem; margin-top: 4px; }
@@ -137,7 +140,7 @@ def _startup_index_posts() -> str:
     """Index posts from sample_posts.json into Elasticsearch on first run."""
     from elasticsearch import Elasticsearch
 
-    from src.index import INDEX_NAME, create_index
+    from src.es_index import INDEX_NAME, create_index
 
     try:
         client = Elasticsearch(ELASTICSEARCH_URL)
@@ -244,10 +247,13 @@ def load_topic_embeddings() -> dict[int, list[float]]:
 
 
 @st.cache_data
-def get_trending() -> list[dict]:
-    return rank_topics(
-        load_assignments(), load_posts_by_id(), load_topic_labels(), load_topic_keywords()
-    )
+def get_trending() -> list[TrendingTopic]:
+    return rank_topics(TopicRankingArgs(
+        assignments=load_assignments(),
+        posts_by_id=load_posts_by_id(),
+        labels=load_topic_labels(),
+        keywords=load_topic_keywords(),
+    ))
 
 
 # ── Search helpers ──────────────────────────────────────────────────────────
@@ -255,7 +261,7 @@ def get_trending() -> list[dict]:
 
 def _search_by_text(query: str, top_k: int) -> list[dict]:
     """Text search from the search bar. Works with all four searchers in get_searcher()."""
-    return run_keyword_search(query, build_searcher(text_engine), top_k=top_k)
+    return run_search_by_text(TextSearchArgs(query=query, searcher=build_searcher(text_engine), top_k=top_k))
 
 
 def _topic_embeddings() -> dict[int, list[float]]:
@@ -264,10 +270,19 @@ def _topic_embeddings() -> dict[int, list[float]]:
     return load_topic_embeddings()
 
 
+def _embedding_strategy_label() -> str:
+    """Human-readable label for the current topic embedding strategy."""
+    return (
+        "Topic keyword embedding"
+        if st.session_state.use_topic_keyword_embeddings
+        else "Topic embedding"
+    )
+
+
 def _search_by_topic(topic_id: int, top_k: int) -> list[dict]:
     """Topic embedding search. Always uses get_topic_searcher() — a semantic searcher."""
     emb = np.array(_topic_embeddings()[topic_id], dtype=np.float32)
-    return run_semantic_search(emb, build_topic_searcher(topic_engine), top_k=top_k)
+    return run_search_by_topic(TopicSearchArgs(embedding=emb, searcher=build_topic_searcher(topic_engine), top_k=top_k))
 
 
 # ── Image helper ────────────────────────────────────────────────────────────
@@ -281,7 +296,15 @@ def _image_uri(image_url: str) -> str:
     img_path = REPO / image_url
     if not img_path.exists():
         return image_url
-    mime = "image/jpeg" if str(img_path).lower().endswith((".jpg", ".jpeg")) else "image/png"
+    suffix = str(img_path).lower()
+    if suffix.endswith((".jpg", ".jpeg")):
+        mime = "image/jpeg"
+    elif suffix.endswith(".gif"):
+        mime = "image/gif"
+    elif suffix.endswith(".webp"):
+        mime = "image/webp"
+    else:
+        mime = "image/png"
     b64 = base64.b64encode(img_path.read_bytes()).decode()
     return f"data:{mime};base64,{b64}"
 
@@ -350,10 +373,7 @@ def render_feed(results: list[dict]) -> None:
         rel_time = _rel_time(created_at)
 
         # Text
-        if post_text:
-            text_html = f'<div class="feed-text">{html.escape(post_text)}</div>'
-        else:
-            text_html = '<div class="feed-text" style="color:#bbb;font-style:italic"></div>'
+        text_html = f'<div class="feed-text">{html.escape(post_text)}</div>' if post_text else ""
 
         # Image
         image_html = ""
@@ -384,16 +404,22 @@ def render_feed(results: list[dict]) -> None:
 
 
 def render_results_eval(results: list[dict]) -> None:
-    rows = build_search_result_rows(
-        results, load_posts_by_id(), load_assignments(), load_topic_labels()
-    )
+    rows = build_search_result_rows(SearchResultRowsArgs(
+        results=results,
+        posts_by_id=load_posts_by_id(),
+        assignments=load_assignments(),
+        labels=load_topic_labels(),
+    ))
+    dicts = []
     for row in rows:
-        if row["image_url"]:
-            row["image"] = _image_uri(row.pop("image_url"))
+        d = row.model_dump()
+        if d["image_url"]:
+            d["image"] = _image_uri(d.pop("image_url"))
         else:
-            row.pop("image_url")
+            d.pop("image_url")
+        dicts.append(d)
 
-    df = pd.DataFrame(rows)
+    df = pd.DataFrame(dicts)
     col_cfg = {
         "score": st.column_config.NumberColumn(
             "Score",
@@ -469,6 +495,9 @@ with st.sidebar:
 
     st.header("Evaluation")
 
+    def _on_eval_view_toggle():
+        st.session_state.eval_view = not st.session_state.eval_view
+
     def _on_topic_eval_toggle():
         st.session_state.show_topic_eval = not st.session_state.show_topic_eval
         st.session_state.active_topic = None
@@ -480,7 +509,7 @@ with st.sidebar:
         "Evaluate search results",
         value=st.session_state.eval_view,
         key="eval_view_sidebar",
-        on_change=lambda: setattr(st.session_state, "eval_view", not st.session_state.eval_view),
+        on_change=_on_eval_view_toggle,
     )
 
     st.toggle(
@@ -523,19 +552,18 @@ trending = get_trending()
 cols = st.columns(3)
 for col, topic in zip(cols, trending, strict=False):
     with col:
-        kw_str = " · ".join(topic["keywords"])
+        kw_str = " · ".join(topic.keywords)
         st.markdown(
             f"""
 <div class="topic-card">
-  <div class="topic-emoji">{topic["emoji"]}</div>
-  <div class="topic-label">{topic["label"]}</div>
-  <div class="topic-stat">❤️ {topic["total_likes"]:,} likes · {topic["post_count"]} posts</div>
+  <div class="topic-label">{topic.label}</div>
+  <div class="topic-stat">❤️ {topic.total_likes:,} likes · {topic.post_count} posts</div>
   <div class="topic-kw">{kw_str}</div>
 </div>""",
             unsafe_allow_html=True,
         )
-        if st.button("Search this topic", key=f"btn_{topic['topic_id']}"):
-            st.session_state.active_topic = topic["topic_id"]
+        if st.button("Search this topic", key=f"btn_{topic.topic_id}"):
+            st.session_state.active_topic = topic.topic_id
             st.session_state.keyword_query = ""
             st.session_state._clear_search = True
             st.session_state.show_topic_eval = False
@@ -639,14 +667,9 @@ if st.session_state.show_topic_eval:
         info = labels[active_eval_topic]
         results = _search_by_topic(active_eval_topic, top_k=DEFAULT_EVAL_K)
 
-        embedding_strategy = (
-            "Topic keyword embedding"
-            if st.session_state.use_topic_keyword_embeddings
-            else "Topic embedding"
-        )
-        st.subheader(f"Results for {info['emoji']} {info['label']}")
+        st.subheader(f"Results for {info['label']}")
         engine_label = get_searcher_label(build_topic_searcher(topic_engine))
-        st.caption(f"Search engine: {engine_label} · Embedding: {embedding_strategy}")
+        st.caption(f"Search engine: {engine_label} · Embedding: {_embedding_strategy_label()}")
 
         if st.session_state.eval_view:
             render_results_eval(results)
@@ -665,7 +688,7 @@ if not st.session_state.show_topic_eval and (
     # Build header text and run search
     if topic_id is not None:
         info = load_topic_labels().get(topic_id, {})
-        label = f"{info.get('emoji', '')} {info.get('label', f'Topic {topic_id}')}"
+        label = info.get("label", f"Topic {topic_id}")
         header_text = f"Results for {label}"
         with st.spinner("Searching…"):
             results = _search_by_topic(topic_id, top_k=TOP_K_DEFAULT)
@@ -676,13 +699,8 @@ if not st.session_state.show_topic_eval and (
 
     st.subheader(header_text)
     if topic_id is not None:
-        embedding_strategy = (
-            "Topic keyword embedding"
-            if st.session_state.use_topic_keyword_embeddings
-            else "Topic embedding"
-        )
         engine_label = get_searcher_label(build_topic_searcher(topic_engine))
-        st.caption(f"Search engine: {engine_label} · Embedding: {embedding_strategy}")
+        st.caption(f"Search engine: {engine_label} · Embedding: {_embedding_strategy_label()}")
     else:
         st.caption(f"Search engine: {get_searcher_label(build_searcher(text_engine))}")
 

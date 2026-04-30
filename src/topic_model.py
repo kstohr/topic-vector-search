@@ -18,6 +18,9 @@ LLM labeling priority:
   1. Ollama at localhost:11434  (no API key needed)
   2. OPENAI_API_KEY env var     (OpenAI API)
   3. KeyBERT keywords only      (no LLM)
+
+
+
 """
 
 import json
@@ -61,29 +64,6 @@ label of at most 3 words. Make sure it is in the following format:
 topic: <topic label>
 """
 
-KEYWORD_EMOJI = {
-    "cat": "🐱", "feline": "🐱", "kitten": "🐱", "meow": "🐱",
-    "rail": "🚄", "train": "🚄", "bullet": "🚄", "transit": "🚄",
-    "music": "🎵", "song": "🎵", "playlist": "🎵", "listen": "🎵",
-    "swim": "🏊", "alcatraz": "🏊",
-    "interior": "🛋️", "interiordesign": "🛋️", "renovation": "🏠",
-    "furniture": "🛋️", "decor": "🛋️",
-    "rocket": "🚀", "astronaut": "👩‍🚀", "nasa": "🚀", "iss": "🚀", "spacex": "🚀",
-    "space": "🚀",
-    "fog": "🌁", "karl": "🌁",
-    "food": "🍽️", "cook": "🍳",
-    "travel": "✈️",
-    "tech": "💻", "ai": "🤖",
-}
-
-
-def _emoji_for(keywords: list[str]) -> str:
-    kw_str = " ".join(keywords).lower()
-    for key, emoji in KEYWORD_EMOJI.items():
-        if key in kw_str:
-            return emoji
-    return "💬"
-
 
 def _build_llm_representation() -> BertTopicOpenAI | None:
     """
@@ -100,9 +80,14 @@ def _build_llm_representation() -> BertTopicOpenAI | None:
         if r.status_code == 200:
             logger.info(f"Ollama reachable at {OLLAMA_URL} — using {OLLAMA_MODEL}")
             client = OpenAI(base_url=OLLAMA_URL, api_key="ollama")
-            return BertTopicOpenAI(client=client, model=OLLAMA_MODEL,
-                                   exponential_backoff=True, chat=True,
-                                   prompt=LABEL_PROMPT, nr_docs=5)
+            return BertTopicOpenAI(
+                client=client,
+                model=OLLAMA_MODEL,
+                exponential_backoff=True,
+                chat=True,
+                prompt=LABEL_PROMPT,
+                nr_docs=5,
+            )
     except Exception:
         pass
 
@@ -114,16 +99,24 @@ def _build_llm_representation() -> BertTopicOpenAI | None:
             organization=os.getenv("OPENAI_ORGANIZATION"),
             project=os.getenv("OPENAI_PROJECT"),
         )
-        return BertTopicOpenAI(client=client, model=OPENAI_MODEL,
-                               exponential_backoff=True, chat=True,
-                               prompt=LABEL_PROMPT, nr_docs=5)
+        return BertTopicOpenAI(
+            client=client,
+            model=OPENAI_MODEL,
+            exponential_backoff=True,
+            chat=True,
+            prompt=LABEL_PROMPT,
+            nr_docs=5,
+        )
 
     logger.warning("No LLM available — topic labels will use KeyBERT keywords only.")
     return None
 
 
 class TopicModeler:
+    """Orchestrates BERTopic training, artifact storage, and visualization."""
+
     def __init__(self, index_name: str = "post_docs", output_path: str = "output"):
+        """Load the embedding model and attempt to connect to Elasticsearch."""
         self.index_name = index_name
         self.output_path = Path(output_path)
         self.output_path.mkdir(exist_ok=True)
@@ -134,8 +127,10 @@ class TopicModeler:
         self.elasticsearch_client = self._try_elasticsearch()
 
     def _try_elasticsearch(self):
+        """Return a connected Elasticsearch client, or None if unavailable."""
         try:
             from elasticsearch import Elasticsearch
+
             client = Elasticsearch(ELASTICSEARCH_URL)
             client.info()
             logger.info("Elasticsearch connection established.")
@@ -147,11 +142,13 @@ class TopicModeler:
     # ── Data retrieval ─────────────────────────────────────────────────────
 
     def retrieve_post_documents(self) -> dict[str, PostDocument]:
+        """Load post documents from Elasticsearch if available, otherwise from disk."""
         if self.elasticsearch_client:
             return self._retrieve_from_elasticsearch()
         return self._retrieve_from_disk()
 
     def _retrieve_from_elasticsearch(self) -> dict[str, PostDocument]:
+        """Scroll through Elasticsearch to retrieve all post documents."""
         if not self.elasticsearch_client.indices.exists(index=self.index_name):
             logger.warning(
                 f"Elasticsearch index '{self.index_name}' does not exist. "
@@ -179,6 +176,7 @@ class TopicModeler:
         return self.doc_index
 
     def _retrieve_from_disk(self) -> dict[str, PostDocument]:
+        """Load post documents from output/processed_posts.json."""
         path = self.output_path / "processed_posts.json"
         logger.info(f"Loading posts from {path}.")
         with open(path) as f:
@@ -191,6 +189,7 @@ class TopicModeler:
     # ── Model training ─────────────────────────────────────────────────────
 
     def train_topic_model(self) -> tuple[list[int], np.ndarray]:
+        """Build and fit the BERTopic model; return topic assignments and probabilities."""
         logger.info("Training BERTopic model.")
 
         texts, embeddings, post_ids = [], [], []
@@ -238,9 +237,7 @@ class TopicModeler:
             verbose=True,
         )
 
-        self.topics, self.probabilities = self.topic_model.fit_transform(
-            texts, embeddings_np
-        )
+        self.topics, self.probabilities = self.topic_model.fit_transform(texts, embeddings_np)
 
         n = self.topic_model.get_topic_info().shape[0] - 1
         logger.info(f"Found {n} topics.")
@@ -249,37 +246,50 @@ class TopicModeler:
     # ── Artifact storage ───────────────────────────────────────────────────
 
     def store_model_data(self) -> None:
+        """Orchestrate saving of all model artifacts to output_path."""
         if not self.topic_model:
             raise RuntimeError("Call train_topic_model() first.")
 
-        # BERTopic model
+        valid_ids = [int(t) for t in self.topic_model.get_topic_info()["Topic"] if int(t) != -1]
+        keywords_by_topic = {
+            tid: [w for w, _ in self.topic_model.get_topic(tid)[:10]] for tid in valid_ids
+        }
+
+        self._save_model()
+        self._save_assignments()
+        self._save_labels(valid_ids, keywords_by_topic)
+        self._save_topic_embeddings(valid_ids)
+        self._save_keyword_embeddings(keywords_by_topic)
+        logger.info(f"All artifacts saved to {self.output_path}/")
+
+    def _save_model(self) -> None:
+        """Save BERTopic model binary to disk."""
         model_path = str(self.output_path / "bertopic_model")
         os.makedirs(model_path, exist_ok=True)
         self.topic_model.save(
-            path=model_path, serialization="pytorch",
-            save_ctfidf=True, save_embedding_model=self.embedding_model,
+            path=model_path,
+            serialization="pytorch",
+            save_ctfidf=True,
+            save_embedding_model=self.embedding_model,
         )
 
-        # Raw outputs
-        pd.DataFrame({
-            "post_id": self._post_ids_for_training,
-            "text": self._texts_for_training,
-            "topic_id": self.topics,
-        }).to_csv(self.output_path / "topic_assignments.csv", index=False)
+    def _save_assignments(self) -> None:
+        """Save topic assignments CSV and raw topics/probabilities JSON."""
+        pd.DataFrame(
+            {
+                "post_id": self._post_ids_for_training,
+                "text": self._texts_for_training,
+                "topic_id": self.topics,
+            }
+        ).to_csv(self.output_path / "topic_assignments.csv", index=False)
 
         with open(self.output_path / "topics.json", "w") as f:
             json.dump(self.topics, f)
         with open(self.output_path / "probabilities.json", "w") as f:
             json.dump(self.probabilities.tolist(), f)
 
-        # topic_labels.json — LLM labels + emoji heuristic
-        topic_info = self.topic_model.get_topic_info()
-        valid_ids = [int(t) for t in topic_info["Topic"] if int(t) != -1]
-        keywords_by_topic = {
-            tid: [w for w, _ in self.topic_model.get_topic(tid)[:10]]
-            for tid in valid_ids
-        }
-
+    def _save_labels(self, valid_ids: list[int], keywords_by_topic: dict[int, list[str]]) -> None:
+        """Parse LLM labels (falling back to top keywords) and write topic_labels.json."""
         llm_labels: dict[int, str] = {}
         aspects = getattr(self.topic_model, "topic_aspects_", {}) or {}
         if "LLM" in aspects:
@@ -296,38 +306,37 @@ class TopicModeler:
         for tid in sorted(valid_ids):
             kws = keywords_by_topic[tid]
             label = llm_labels.get(tid) or " · ".join(kws[:3])
-            emoji = _emoji_for(kws)
-            labels_out[str(tid)] = {"label": label, "emoji": emoji}
-            logger.info(f"  Topic {tid:2d}: {emoji}  {label}  [{', '.join(kws[:5])}]")
+            labels_out[str(tid)] = {"label": label}
+            logger.info(f"  Topic {tid:2d}: {label}  [{', '.join(kws[:5])}]")
 
         with open(self.output_path / "topic_labels.json", "w") as f:
             json.dump(labels_out, f, indent=2, ensure_ascii=False)
 
-        # topic_embeddings.json — mean of document embeddings assigned to each topic
-        # (BERTopic's topic_embeddings_; index 0 = outlier cluster, real topics start at 1)
+    def _save_topic_embeddings(self, valid_ids: list[int]) -> None:
+        """Write topic_embeddings.json from BERTopic's internal topic embedding matrix."""
+        # index 0 = outlier cluster, real topics start at 1
         topic_embs = getattr(self.topic_model, "topic_embeddings_", None)
-        if topic_embs is not None:
-            topic_embedding_map = {
-                tid: topic_embs[tid + 1].tolist()
-                for tid in valid_ids
-                if (tid + 1) < len(topic_embs)
-            }
-            with open(self.output_path / "topic_embeddings.json", "w") as f:
-                json.dump({str(k): v for k, v in topic_embedding_map.items()}, f)
+        if topic_embs is None:
+            return
+        topic_embedding_map = {
+            tid: topic_embs[tid + 1].tolist()
+            for tid in valid_ids
+            if (tid + 1) < len(topic_embs)
+        }
+        with open(self.output_path / "topic_embeddings.json", "w") as f:
+            json.dump({str(k): v for k, v in topic_embedding_map.items()}, f)
 
-        # topic_keyword_embeddings.json — embeddings derived from top representative keywords
+    def _save_keyword_embeddings(self, keywords_by_topic: dict[int, list[str]]) -> None:
+        """Write topic_keyword_embeddings.json by encoding each topic's top keywords."""
         topic_keyword_embs = {
-            tid: self.embedding_model.encode(
-                " ".join(kws[:10]), convert_to_numpy=True
-            ).tolist()
+            tid: self.embedding_model.encode(" ".join(kws[:10]), convert_to_numpy=True).tolist()
             for tid, kws in keywords_by_topic.items()
         }
         with open(self.output_path / "topic_keyword_embeddings.json", "w") as f:
             json.dump({str(k): v for k, v in topic_keyword_embs.items()}, f)
 
-        logger.info(f"All artifacts saved to {self.output_path}/")
-
     def generate_visualizations(self) -> None:
+        """Write BERTopic HTML visualizations to output_path."""
         if not self.topic_model:
             return
         out = str(self.output_path)
@@ -339,6 +348,7 @@ class TopicModeler:
         logger.info("Visualizations saved.")
 
     def load_topic_model(self) -> BERTopic:
+        """Load a previously saved BERTopic model from output_path."""
         model_path = str(self.output_path / "bertopic_model")
         self.topic_model = BERTopic.load(model_path)
         logger.info(f"Model loaded from {model_path}.")
@@ -347,6 +357,7 @@ class TopicModeler:
     # ── Main pipeline ──────────────────────────────────────────────────────
 
     def run(self) -> None:
+        """Run the full topic modeling pipeline: load → train → visualize → save."""
         self.retrieve_post_documents()
         self.train_topic_model()
         self.generate_visualizations()

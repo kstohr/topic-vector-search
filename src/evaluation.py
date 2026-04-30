@@ -32,7 +32,7 @@ import numpy as np
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, PositiveInt
 
-from src.search import run_semantic_search
+from src.search import TopicSearchArgs, run_search_by_topic
 
 DEFAULT_EVAL_K = 100
 DEFAULT_RECALL_K = 100
@@ -45,6 +45,8 @@ def compute_random_baseline(topic_size: int, dataset_size: int):
 
 
 class TopicSearchMetricArgs(BaseModel):
+    """Input arguments for compute_topic_search_eval_metrics."""
+
     dataset_size: PositiveInt  # Used to compute random baseline precision
     retrieved_ids: list[str]
     topic_post_ids: set[str]
@@ -53,6 +55,8 @@ class TopicSearchMetricArgs(BaseModel):
 
 
 class TopicSearchMetrics(BaseModel):
+    """Precision, recall, and baseline metrics for a single topic search evaluation."""
+
     precision_at_k: float = 0.0
     recall_at_k: float = 0.0
     baseline: float = 0.0
@@ -97,6 +101,8 @@ def compute_topic_search_eval_metrics(args: TopicSearchMetricArgs) -> TopicSearc
 
 
 class TopicEvalArgs(BaseModel):
+    """Input arguments for evaluate_topics."""
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     corpus_size: int
@@ -109,6 +115,8 @@ class TopicEvalArgs(BaseModel):
 
 
 class TopicEvalRow(TopicSearchMetrics):
+    """A single row in the topic evaluation DataFrame."""
+
     topic: str
     keywords: str
     assigned_posts: int
@@ -148,7 +156,7 @@ def evaluate_topics(args: TopicEvalArgs) -> pd.DataFrame:
         kws = keywords.get(topic_id, [])[:10] if keywords else []
 
         # Next run search for evaluation
-        search_results = run_semantic_search(emb, searcher, top_k=args.eval_k)
+        search_results = run_search_by_topic(TopicSearchArgs(embedding=emb, searcher=searcher, top_k=args.eval_k))
 
         # Display general scores
         scores = [r["score"] for r in search_results]
@@ -165,7 +173,7 @@ def evaluate_topics(args: TopicEvalArgs) -> pd.DataFrame:
 
         # define the row for this topic
         row = TopicEvalRow(
-            topic=f"{info['emoji']} {info['label']}",
+            topic=info["label"],
             keywords=", ".join(kws),
             assigned_posts=len(assigned),
             avg_search_score=np.mean(scores) if scores else 0.0,
@@ -184,24 +192,40 @@ def evaluate_topics(args: TopicEvalArgs) -> pd.DataFrame:
     return df
 
 
+class SearchResultRowsArgs(BaseModel):
+    """Input arguments for build_search_result_rows."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    results: list[dict]
+    posts_by_id: dict[str, dict]
+    assignments: pd.DataFrame
+    labels: dict[int, dict]
+
+
+class SearchResultRow(BaseModel):
+    """A single search result row enriched with topic label and display text."""
+
+    score: float
+    post: str
+    topic: str
+    image_url: str
+    post_id: str
+
+
 # Helper to join search results with topic assignments and post metadata for
 # display in the demo app. Not strictly part of evaluation, but useful for understanding results.
-def build_search_result_rows(
-    results: list[dict],
-    posts_by_id: dict[str, dict],
-    assignments: pd.DataFrame,
-    labels: dict[int, dict],
-) -> list[dict]:
+def build_search_result_rows(args: SearchResultRowsArgs) -> list[SearchResultRow]:
     """
     Join search results with topic assignments and post metadata.
-    Returns a list of flat dicts ready for display or ranking.
+    Returns a list of SearchResultRow ready for display or ranking.
     """
-    id_to_label = {tid: f"{v['emoji']} {v['label']}" for tid, v in labels.items()}
+    id_to_label = {tid: v["label"] for tid, v in args.labels.items()}
 
     rows = []
-    for r in results:
+    for r in args.results:
         pid = r.get("post_id", "")
-        post = posts_by_id.get(pid, {})
+        post = args.posts_by_id.get(pid, {})
         text = r.get("post_text", "").strip()
         caption = (post.get("image_caption") or "").strip()
 
@@ -213,19 +237,17 @@ def build_search_result_rows(
             display_text = "[image — no caption yet]"
 
         topic_label = ""
-        match = assignments.loc[assignments["post_id"] == pid, "topic_id"]
+        match = args.assignments.loc[args.assignments["post_id"] == pid, "topic_id"]
         if len(match):
             tid = int(match.values[0])
             topic_label = id_to_label.get(tid, f"Topic {tid}")
 
-        rows.append(
-            {
-                "score": round(r.get("score", 0), 3),
-                "post": display_text,
-                "topic": topic_label,
-                "image_url": post.get("image_url", ""),
-                "post_id": pid,
-            }
-        )
+        rows.append(SearchResultRow(
+            score=round(r.get("score", 0), 3),
+            post=display_text,
+            topic=topic_label,
+            image_url=post.get("image_url", ""),
+            post_id=pid,
+        ))
 
     return rows

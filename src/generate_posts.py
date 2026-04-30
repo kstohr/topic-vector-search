@@ -7,21 +7,21 @@ import logging
 import random
 import uuid
 from datetime import datetime, timedelta
+from pathlib import Path
 
 from openai import OpenAI
 
-from src.config import OLLAMA_MODEL, OLLAMA_URL
+from src.config import OLLAMA_MODEL, OLLAMA_URL, REPO
+from src.models import Post
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
+ASSETS_DIR = REPO / "assets"
+
 logger = logging.getLogger(__name__)
 
-RANDOM_SEED = 99
+POSTS_PER_TOPIC = 20
+RANDOM_POST_COUNT = 30
 
-client = OpenAI(base_url=OLLAMA_URL, api_key="ollama")
-
-# Define the topics and keywords
-topics = {
+TOPICS = {
     "Cats, cats, cats": [
         "😺 Meow",
         "😻 Purr",
@@ -122,130 +122,135 @@ topics = {
     ],
 }
 
-number_of_posts = 20  # Number of posts per topic
 
-
-# Function to generate a random datetime for the post creation and modification within the past year
-def random_datetime():
+def _random_datetime() -> datetime:
+    """Return a random datetime within the past year."""
     start = datetime.now() - timedelta(days=365)
-    end = datetime.now()
-    return start + (end - start) * random.random()
+    return start + (datetime.now() - start) * random.random()
 
 
-# Function to call Ollama to generate posts
-def generate_posts_list(topic, keywords):
-    prompt = f"""
-    Generate a list of {number_of_posts} unique social media posts about {topic}.
-    Include relevant emojis and keywords such as {','.join(keywords)}.
-    Make each
-    post engaging and relevant to the topic. Do not repeat the content of posts.
-    Posts content should be unique. Vary the length of
-    posts from one sentence to 10 sentences. Posts on more serious topics should
-    be longer and do not need to include emojis. The tone of posts for more
-    serious topics can range from excited to concerned and the sentiment can be
-    positive, negative or neutral. Return each post as a separate line. Avoid
-    numbering the posts or using any list formatting.
-    """
-
-    response = client.chat.completions.create(
-        model=OLLAMA_MODEL,
-        messages=[
-            {
-                "role": "system",
-                "content": "You are a helpful assistant that generates creative social media posts.",  # noqa: E501
-            },
-            {"role": "user", "content": prompt},
-        ],
-        max_tokens=1200,
-        temperature=0.7,
+def _make_image_post(image_path: Path) -> Post:
+    """Build an image-only Post. post_text is empty; caption is populated by preprocess.py."""
+    return Post(
+        post_id=str(uuid.uuid4()),
+        post_author=f"user_{random.randint(1, 100)}",
+        created_at=_random_datetime().isoformat(),
+        modified_at=_random_datetime().isoformat(),
+        post_text="",
+        image_url=str(image_path.relative_to(REPO)),
+        generated_topic=image_path.stem,
     )
 
-    # Split the response into individual posts
-    if response.choices[0].message.content is None:
-        logger.error("Failed to generate random posts.")
-        raise ValueError("Failed to generate random posts.")
-    post_texts = response.choices[0].message.content.split("\n")
-    return [post.strip() for post in post_texts if post.strip()]
 
-
-def main():
-    # Generate posts
-    posts = []
-
-    # Generate posts for each topic
-    for topic, keywords in topics.items():
-        logger.info(f"Generating posts for topic: {topic}")
-        post_texts = generate_posts_list(topic, keywords)
-        for post_text in post_texts:
-            post = {
-                "post_id": str(uuid.uuid4()),
-                "post_author": f"user_{random.randint(1, 100)}",
-                "created_at": random_datetime().isoformat(),
-                "modified_at": random_datetime().isoformat(),
-                "post_text": post_text,
-                "generated_topic": topic,
-                "txt_embedding": [],
-            }
-            posts.append(post)
-
-    # Generate random posts for other topics
-    number_of_random_posts = 30  # Number of posts with random topics
-    random_topic_prompt = f"""
-    Generate a list of {number_of_random_posts} unique social media posts on
-    {number_of_random_posts} distinct topics. Follow the guidelines below in
-    creating a set of posts:
-    - Include emojis to make them
-    engaging.
-    - Do not repeat the content of posts.
-    - Vary the topic of the posts so that they are on random and distinct topics.
-    (e.g., food, art, culture, travel, sports, technology, history, science, etc.)
-    - Some posts can emulate short responses to other posts not included in the list.
-    - Vary the length of posts from 1 sentence to 5 sentences.
-    - Vary the tone of the posts from serious to lighthearted
-    - Vary the sentiment of the posts from positive, negative to neutral.
-
-    Return each post as a separate line. Avoid numbering the posts or using any list formatting.
-    """
-    logger.info("Generating random posts")
-    response = client.chat.completions.create(
-        model=OLLAMA_MODEL,
-        messages=[
-            {
-                "role": "system",
-                "content": "You are a helpful assistant that generates social media posts.",
-            },
-            {"role": "user", "content": random_topic_prompt},
-        ],
-        max_tokens=1800,
-        temperature=0.7,
+def _make_post(post_text: str, generated_topic: str) -> Post:
+    """Build a text Post with a random author and timestamps."""
+    return Post(
+        post_id=str(uuid.uuid4()),
+        post_author=f"user_{random.randint(1, 100)}",
+        created_at=_random_datetime().isoformat(),
+        modified_at=_random_datetime().isoformat(),
+        post_text=post_text,
+        generated_topic=generated_topic,
     )
 
-    # Split the random topic posts into individual entries
-    if response.choices[0].message.content is None:
-        logger.error("Failed to generate random posts.")
-        raise ValueError("Failed to generate random posts.")
-    random_posts = response.choices[0].message.content.split("\n")
-    random_posts = [post.strip() for post in random_posts if post.strip()]
 
-    for post_text in random_posts:
-        post = {
-            "post_id": str(uuid.uuid4()),
-            "post_author": f"user_{random.randint(1, 100)}",
-            "created_at": random_datetime().isoformat(),
-            "modified_at": random_datetime().isoformat(),
-            "post_text": post_text,
-            "generated_topic": "noise",
-            "txt_embedding": [],
-        }
-        posts.append(post)
+class PostGenerator:
+    """Generates synthetic social media posts via an LLM."""
 
-    # Save the posts to a JSON file
-    output_path = "sample_posts.json"
-    with open(output_path, "w") as file:
-        json.dump(posts, file, indent=4)
+    def __init__(self) -> None:
+        """Initialise the OpenAI-compatible client pointed at Ollama."""
+        self.client = OpenAI(base_url=OLLAMA_URL, api_key="ollama")
 
-    print(f"Sample posts generated and saved to {output_path}")
+    def generate_topic_posts(self) -> list[Post]:
+        """Generate posts for each defined topic in TOPICS."""
+        posts = []
+        for topic, keywords in TOPICS.items():
+            logger.info(f"Generating posts for topic: {topic}")
+            texts = self._call_llm_for_topic(topic, keywords)
+            posts.extend(_make_post(t, topic) for t in texts)
+        return posts
+
+    def generate_image_posts(self) -> list[Post]:
+        """Create one image-only post per image file found in assets/."""
+        image_extensions = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+        images = [p for p in ASSETS_DIR.iterdir() if p.suffix.lower() in image_extensions]
+        logger.info(f"Creating {len(images)} image posts from {ASSETS_DIR.name}/.")
+        return [_make_image_post(img) for img in sorted(images)]
+
+    def generate_random_posts(self) -> list[Post]:
+        """Generate random off-topic posts across distinct subjects."""
+        logger.info(f"Generating {RANDOM_POST_COUNT} random posts.")
+        texts = self._call_llm_for_random()
+        return [_make_post(t, "noise") for t in texts]
+
+    def _call_llm_for_topic(self, topic: str, keywords: list[str]) -> list[str]:
+        """Call the LLM to generate posts for a single topic. Returns a list of post strings."""
+        prompt = f"""
+        Generate a list of {POSTS_PER_TOPIC} unique social media posts about {topic}.
+        Include relevant emojis and keywords such as {','.join(keywords)}.
+        Make each post engaging and relevant to the topic. Do not repeat the content of posts.
+        Posts content should be unique. Vary the length of posts from one sentence to 10 sentences.
+        Posts on more serious topics should be longer and do not need to include emojis.
+        The tone of posts for more serious topics can range from excited to concerned and the
+        sentiment can be positive, negative or neutral.
+        Return each post as a separate line. Avoid numbering the posts or using any list formatting.
+        """
+        response = self.client.chat.completions.create(
+            model=OLLAMA_MODEL,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant that generates creative social media posts.",
+                },
+                {"role": "user", "content": prompt},
+            ],
+            max_tokens=1200,
+            temperature=0.7,
+        )
+        if response.choices[0].message.content is None:
+            raise ValueError(f"LLM returned no content for topic '{topic}'.")
+        return [p.strip() for p in response.choices[0].message.content.split("\n") if p.strip()]
+
+    def _call_llm_for_random(self) -> list[str]:
+        """Call the LLM to generate random off-topic posts. Returns a list of post strings."""
+        prompt = f"""
+        Generate a list of {RANDOM_POST_COUNT} unique social media posts on
+        {RANDOM_POST_COUNT} distinct topics. Follow the guidelines below:
+        - Include emojis to make them engaging.
+        - Do not repeat the content of posts.
+        - Vary the topic of the posts so that they are on random and distinct topics.
+          (e.g., food, art, culture, travel, sports, technology, history, science, etc.)
+        - Some posts can emulate short responses to other posts not included in the list.
+        - Vary the length of posts from 1 sentence to 5 sentences.
+        - Vary the tone of the posts from serious to lighthearted.
+        - Vary the sentiment of the posts from positive, negative to neutral.
+        Return each post as a separate line. Avoid numbering the posts or using any list formatting.
+        """
+        response = self.client.chat.completions.create(
+            model=OLLAMA_MODEL,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant that generates social media posts.",
+                },
+                {"role": "user", "content": prompt},
+            ],
+            max_tokens=1800,
+            temperature=0.7,
+        )
+        if response.choices[0].message.content is None:
+            raise ValueError("LLM returned no content for random posts.")
+        return [p.strip() for p in response.choices[0].message.content.split("\n") if p.strip()]
+
+    def run(self) -> None:
+        """Generate all posts and write them to sample_posts.json."""
+        posts = self.generate_topic_posts() + self.generate_random_posts() + self.generate_image_posts()
+        output_path = REPO / "sample_posts.json"
+        with open(output_path, "w") as f:
+            json.dump([p.model_dump(mode="json") for p in posts], f, indent=4)
+        logger.info(f"Saved {len(posts)} posts to {output_path.name}.")
 
 
 if __name__ == "__main__":
-    main()
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
+    PostGenerator().run()

@@ -1,7 +1,11 @@
+"""Search backends: keyword (BM25/in-memory) and semantic (Elasticsearch/in-memory)."""
+
 import logging
+from typing import Any
 
 import numpy as np
 from elasticsearch import Elasticsearch
+from pydantic import BaseModel, ConfigDict
 from sentence_transformers import SentenceTransformer
 
 from src.config import ELASTICSEARCH_URL, EMBEDDING_MODEL_NAME
@@ -21,13 +25,15 @@ class EmptySearchIndexError(Exception):
 class KeywordSearcher:
     """Keyword search (lexical/BM25) via Elasticsearch."""
 
-    def __init__(self, posts: list[dict], index_name: str = "post_docs"):
+    def __init__(self, _posts: list[dict], index_name: str = "post_docs"):
+        """Initialise Elasticsearch client. _posts is unused (accepted for factory compatibility)."""
         self.index_name = index_name
         self.client = Elasticsearch(ELASTICSEARCH_URL)
 
     def search_similar_documents(
-        self, query: str, top_k: int = TOP_K_DEFAULT, filters: list[dict] = None
+        self, query: str, top_k: int = TOP_K_DEFAULT, filters: list[dict] | None = None
     ) -> list[dict]:
+        """Run a BM25 match query against post_text and return ranked results."""
         body = {
             "size": top_k,
             "query": {"match": {"post_text": query}},
@@ -46,6 +52,7 @@ class KeywordSearcher:
         return sorted(results, key=lambda r: r.get("score", 0.0), reverse=True)
 
     def search(self, input_data: list[str] | str, top_k: int = TOP_K_DEFAULT) -> list[dict]:
+        """Accept a string or list of strings and pass to search_similar_documents."""
         query = " ".join(input_data) if isinstance(input_data, list) else str(input_data)
         return self.search_similar_documents(query, top_k)
 
@@ -54,11 +61,13 @@ class InMemoryKeywordSearcher:
     """Keyword search (lexical substring match) over post text — no Elasticsearch required."""
 
     def __init__(self, posts: list[dict]):
+        """Store posts for in-memory search."""
         self.posts = posts
 
     def search_similar_documents(
-        self, query: str, top_k: int = TOP_K_DEFAULT, filters: list[dict] = None
+        self, query: str, top_k: int = TOP_K_DEFAULT, filters: list[dict] | None = None
     ) -> list[dict]:
+        """Count query occurrences in each post and return the top_k matches."""
         q = query.lower()
         results = [
             {
@@ -72,6 +81,7 @@ class InMemoryKeywordSearcher:
         return ranked[:top_k]
 
     def search(self, input_data: list[str] | str, top_k: int = TOP_K_DEFAULT) -> list[dict]:
+        """Accept a string or list of strings and delegate to search_similar_documents."""
         query = " ".join(input_data) if isinstance(input_data, list) else str(input_data)
         return self.search_similar_documents(query, top_k)
 
@@ -87,10 +97,11 @@ class SemanticSearcher:
 
     def __init__(
         self,
-        posts: list[dict],
+        _posts: list[dict],
         index_name: str = "post_docs",
         embedding_model_name: str = EMBEDDING_MODEL_NAME,
     ):
+        """Initialise embedding model and Elasticsearch client. _posts unused (factory compat)."""
         self.index_name = index_name
         self.embedding_model = SentenceTransformer(embedding_model_name)
         self.client = Elasticsearch(ELASTICSEARCH_URL)
@@ -106,7 +117,7 @@ class SemanticSearcher:
         self,
         embedding: np.ndarray,
         top_k: int = TOP_K_DEFAULT,
-        filters: list[dict] = None,
+        filters: list[dict] | None = None,
     ) -> list[dict]:
         """Vector search in Elasticsearch.
 
@@ -151,12 +162,7 @@ class SemanticSearcher:
         return results
 
     def search(self, input_data: list[str] | np.ndarray, top_k: int = TOP_K_DEFAULT) -> list[dict]:
-        """
-        Search for similar documents using either a list of keywords or a provided embedding.
-        :param input_data: A list of keywords to convert to an embedding or an embedding itself.
-        :param top_k: The number of top similar documents to retrieve.
-        :return: A list of similar documents from Elasticsearch.
-        """
+        """Accept keywords or a raw embedding and delegate to search_similar_documents."""
         # Determine if keywords are provided or if an embedding is directly provided
         if isinstance(input_data, list):
             logger.info("Keywords provided, converting to embedding.")
@@ -177,6 +183,7 @@ class InMemorySemanticSearcher:
     """
 
     def __init__(self, posts: list[dict], embedding_model_name: str = EMBEDDING_MODEL_NAME):
+        """Pre-normalise post embeddings into a matrix for fast cosine scoring."""
         self.embedding_model = SentenceTransformer(embedding_model_name)
         self.posts = posts
         embeddings = np.array([p["doc_embedding"] for p in posts], dtype=np.float32)
@@ -184,6 +191,7 @@ class InMemorySemanticSearcher:
         self.embeddings_norm = embeddings / np.where(norms == 0, 1, norms)
 
     def convert_keywords_to_embedding(self, keywords: list[str]) -> np.ndarray:
+        """Join keywords into a single string and encode to an embedding."""
         text = " ".join(keywords)
         return self.embedding_model.encode(text, convert_to_numpy=True)
 
@@ -191,8 +199,9 @@ class InMemorySemanticSearcher:
         self,
         embedding: np.ndarray,
         top_k: int = TOP_K_DEFAULT,
-        filters: list[dict] = None,
+        filters: list[dict] | None = None,
     ) -> list[dict]:
+        """Score all posts by cosine similarity and return the top_k results."""
         q = embedding / (np.linalg.norm(embedding) or 1)
         scores = self.embeddings_norm @ q
         top_indices = np.argsort(scores)[::-1][:top_k]
@@ -205,6 +214,7 @@ class InMemorySemanticSearcher:
         return results
 
     def search(self, input_data: list[str] | np.ndarray, top_k: int = TOP_K_DEFAULT) -> list[dict]:
+        """Accept keywords or a raw embedding and delegate to search_similar_documents."""
         if isinstance(input_data, list):
             embedding = self.convert_keywords_to_embedding(input_data)
         elif isinstance(input_data, np.ndarray):
@@ -223,6 +233,7 @@ _SEARCHER_LABELS = {
 
 
 def get_searcher_label(searcher) -> str:
+    """Return a human-readable label for the given searcher instance."""
     return _SEARCHER_LABELS.get(type(searcher).__name__, type(searcher).__name__)
 
 
@@ -257,20 +268,42 @@ def get_topic_searcher(
     return _SEARCHER_CLASSES[engine](posts)
 
 
-def run_keyword_search(query: str, searcher, top_k: int = TOP_K_DEFAULT) -> list[dict]:
-    if hasattr(searcher, "embedding_model"):
-        embedding = searcher.embedding_model.encode(query, convert_to_numpy=True)
-        return searcher.search_similar_documents(embedding, top_k=top_k)
-    return searcher.search_similar_documents(query, top_k=top_k)
+class TextSearchArgs(BaseModel):
+    """Input arguments for run_search_by_text."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    query: str
+    searcher: Any
+    top_k: int = TOP_K_DEFAULT
 
 
-def run_semantic_search(embedding: np.ndarray, searcher, top_k: int = TOP_K_DEFAULT) -> list[dict]:
-    if not hasattr(searcher, "embedding_model"):
+class TopicSearchArgs(BaseModel):
+    """Input arguments for run_search_by_topic."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    embedding: np.ndarray
+    searcher: Any
+    top_k: int = TOP_K_DEFAULT
+
+
+def run_search_by_text(args: TextSearchArgs) -> list[dict]:
+    """Powers the search bar in the demo app. Dispatches to keyword or semantic search based on searcher type."""
+    if hasattr(args.searcher, "embedding_model"):
+        embedding = args.searcher.embedding_model.encode(args.query, convert_to_numpy=True)
+        return args.searcher.search_similar_documents(embedding, top_k=args.top_k)
+    return args.searcher.search_similar_documents(args.query, top_k=args.top_k)
+
+
+def run_search_by_topic(args: TopicSearchArgs) -> list[dict]:
+    """Powers topic embedding search. Requires a semantic searcher."""
+    if not hasattr(args.searcher, "embedding_model"):
         raise TypeError(
-            f"{type(searcher).__name__} does not support embedding-based search. "
+            f"{type(args.searcher).__name__} does not support embedding-based search. "
             "Switch get_searcher() to return InMemorySemanticSearcher or SemanticSearcher."
         )
-    return searcher.search_similar_documents(embedding, top_k=top_k)
+    return args.searcher.search_similar_documents(args.embedding, top_k=args.top_k)
 
 
 # Example usage
