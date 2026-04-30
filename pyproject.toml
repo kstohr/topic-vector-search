@@ -1,28 +1,83 @@
-[tool.poetry]
+[project]
 name = "topic-vector-search"
 version = "0.1.0"
-description = "Materials for talk on Thinking of Topic Modeling as Search"
-authors = ["Kas Stohr <kas@99antennas.com>"]
+description = "Materials for PyCon 2026 tutorial: Thinking of Topic Modeling as Search"
+authors = [{ name = "Kas Stohr", email = "kas@99antennas.com" }]
 readme = "README.md"
-license = "MIT"
+license = { text = "MIT" }
+requires-python = ">=3.12,<3.13"
 
-[tool.poetry.dependencies]
-python = "^3.12"
-pydantic = "^2.9.1"
-opensearch-py = "^2.7.1"
-openai = "^1.45.0"
-sentence-transformers = "^3.1.0"
-bertopic = "^0.16.3"
-emoji = "^2.12.1"
-gensim = "^4.3.3"
-python-dotenv = "^1.0.1"
+dependencies = [
+    "pydantic>=2.9.1",
+    "elasticsearch>=8.0,<9.0",
+    "openai>=1.45.0",
+    "sentence-transformers>=3.1.0,<5",
+    "bertopic>=0.16.3",
+    "emoji>=2.12.1",
+    "gensim>=4.3.3",
+    "python-dotenv>=1.0.1",
+    "streamlit>=1.35",
+    "numpy>=1.26,<2",
+    "pandas>=2.0",
+    "httpx>=0.27",
+    "datasets>=2.0",
+    "Pillow>=10.0",
+    "torch>=2.0,<2.3",
+    "torchvision>=0.17,<0.18",
+    "ruff>=0.15.12",
+]
 
-
-[tool.poetry.group.dev.dependencies]
-ruff = "^0.6.5"
-jupyterlab = "^4.2.5"
-jupyter-contrib-nbextensions = "^0.7.0"
+[dependency-groups]
+dev = [
+    "ruff>=0.6.5",
+    "jupyterlab>=4.2.5",
+    "pytest>=9.0.3",
+]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[tool.uv]
+package = false
+constraint-dependencies = [
+    # Pin to versions with pre-built macOS x86_64 (Intel) wheels.
+    # llvmlite 0.44+ dropped Intel Mac wheels; 0.43.x pairs with numba 0.60.x.
+    "llvmlite<0.44",
+    "numba<0.61",
+    "transformers<5",
+]
+environments = [
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "sys_platform == 'linux' and platform_machine == 'aarch64'",
+    "sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    "sys_platform == 'win32'",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+  "E",
+  "F",
+  "I",
+  "UP",
+  "B",
+  "SIM",
+]
+fixable = ["ALL"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
