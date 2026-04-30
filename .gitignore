@@ -76,4 +76,8 @@ venv.bak/
 #pyenv
 .python-version
 
+# Data outputs
+output/
+
+
 

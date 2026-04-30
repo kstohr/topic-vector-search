@@ -1,15 +1,25 @@
 services:
-# sample-docker-compose-file-for-development
-# https://opensearch.org/docs/latest/install-and-configure/install-opensearch/docker/
-  opensearch:
-    image: opensearchproject/opensearch:2.13.0
-    container_name: opensearch-1
+# https://www.elastic.co/guide/en/elasticsearch/reference/current/docker.html
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
+    container_name: elasticsearch-1
     environment:
-      - discovery.type=single-node # Single node
-      - "DISABLE_INSTALL_DEMO_CONFIG=true" # Prevent install of demo certs/security config
-      - "DISABLE_SECURITY_PLUGIN=true" # Disable security plugin
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
     ports:
-      - 9200:9200
-      - 9300:9300 # Performance analyzer
-    logging:
-      driver: "none"
+      - 9201:9200
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama-1
+    ports:
+      - 11434:11434
+    volumes:
+      - ollama_data:/root/.ollama
+    # Pull the model on first start so it's ready before the workshop
+    entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 5 && ollama pull qwen2.5:3b && wait"]
+
+volumes:
+  ollama_data:

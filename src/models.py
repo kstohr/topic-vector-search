@@ -1,51 +1,54 @@
+"""Pydantic models for raw posts (Post) and processed post documents (PostDocument)."""
+
 import re
-from datetime import datetime, timezone
-from typing import List, Optional
+from datetime import UTC, datetime
 
 import emoji
 import numpy as np
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sentence_transformers import SentenceTransformer
 
+from src.config import EMBEDDING_MODEL_NAME
 
-# Define the Pydantic model for posts
-class PostDocument(BaseModel):
+
+class Post(BaseModel):
+    """Raw, unprocessed social media post as generated or ingested."""
+
     post_id: str
     post_author: str
     created_at: datetime
     modified_at: datetime
     post_text: str
-    doc_embedding: Optional[List[float]] = Field(default_factory=list)
+    likes: int = 0
+    image_url: str | None = None
+    generated_topic: str | None = None
 
     @field_validator("created_at", "modified_at", mode="before")
     @classmethod
-    def set_datetime_to_utc(cls, value):
-        # Parse the datetime string, convert to UTC, and return in ISO format
+    def set_datetime_to_utc(cls, value: str) -> str:
+        """Normalise datetime strings to UTC ISO format."""
         dt = datetime.fromisoformat(value)
-        if (
-            dt.tzinfo is None
-        ):  # If no timezone info, assume it's local and convert to UTC
-            dt = dt.replace(tzinfo=timezone.utc)
-        else:  # Convert to UTC if timezone info is present
-            dt = dt.astimezone(timezone.utc)
+        if dt.tzinfo is None:  # noqa: SIM108
+            dt = dt.replace(tzinfo=UTC)
+        else:
+            dt = dt.astimezone(UTC)
         return dt.isoformat()
 
-    def preprocess_text(self):
+    def preprocess_text(self, text: str | None = None) -> str:
         """
         Passed to model pipeline. Standard pre-processing of text after cleaning,
         prior to modeling. Does not include sentence splitting. If sentence
         embeddings are needed use `preprocess_sentences`.
         """
-        # Replace emojis with their textual descriptions
-        text = emoji.demojize(self.post_text)  # noqa
-        # Lowercase the text
+        if text is None:
+            text = self.post_text
+        text = emoji.demojize(text)  # noqa
         text = text.lower()
-        # Remove punctuation but preserve contractions and compound words
         text = re.sub(r"[^\w\s'-]", "", text)
-        # Remove extra whitespaces
         text = re.sub(r"\s+", " ", text).strip()
         return text
 
+    # Commented out due to SpaCy dependency
     # async def preprocess_sentences(self) -> list[str]:
     #     """
     #     Splits the text into sentences. Pre-processes each sentence. Returns a list
@@ -68,19 +71,15 @@ class PostDocument(BaseModel):
         by lowercasing, removing numbers, extra whitespaces, and replacing emojis
         with their textual descriptions.
         """
-
-        # Split text into sentences using regex (matches periods, exclamations, and questions)
         split_text = re.split(r"(?<=[.!?])\s+", self.post_text)
-
-        # Apply preprocessing to each sentence
         sentences = [self.preprocess_text(sent) for sent in split_text if sent.strip()]
         return sentences
 
-    # Create embeddings using SentenceTransformers and store them in the txt_embedding field
-    def create_embeddings(self):
-        model = SentenceTransformer("all-MiniLM-L6-v2")
-        embeddings = model.encode(self.preprocess_sentences())
-        self.doc_embedding = np.mean(embeddings, axis=0).tolist()
 
-    class Config:
-        arbitrary_types_allowed = True
+class PostDocument(Post):
+    """Processed post document with image caption and embedding populated by preprocess.py."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    image_caption: str | None = None
+    doc_embedding: list[float] = Field(default_factory=list)
