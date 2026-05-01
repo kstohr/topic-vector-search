@@ -61,6 +61,11 @@ docker compose down
 uv sync 
 uv run streamlit run app.py (the app preloads sample posts on startup)
 ```
+To removed cached pre-trained models: 
+
+```
+rm -rf ~/.cache/huggingface/hub/models--Salesforce--blip-image-captioning-base
+```
 ---
 
 ## No Docker? No problem.

@@ -26,7 +26,7 @@ class KeywordSearcher:
     """Keyword search (lexical/BM25) via Elasticsearch."""
 
     def __init__(self, _posts: list[dict], index_name: str = "post_docs"):
-        """Initialise Elasticsearch client. _posts is unused (accepted for factory compatibility)."""
+        """Initialise Elasticsearch client. _posts unused (keep for compatibility)."""
         self.index_name = index_name
         self.client = Elasticsearch(ELASTICSEARCH_URL)
 
@@ -49,7 +49,7 @@ class KeywordSearcher:
             }
             for hit in resp["hits"]["hits"]
         ]
-        return sorted(results, key=lambda r: r.get("score", 0.0), reverse=True)
+        return sorted(results, key=lambda result: result.get("score", 0.0), reverse=True)
 
     def search(self, input_data: list[str] | str, top_k: int = TOP_K_DEFAULT) -> list[dict]:
         """Accept a string or list of strings and pass to search_similar_documents."""
@@ -68,16 +68,16 @@ class InMemoryKeywordSearcher:
         self, query: str, top_k: int = TOP_K_DEFAULT, filters: list[dict] | None = None
     ) -> list[dict]:
         """Count query occurrences in each post and return the top_k matches."""
-        q = query.lower()
+        query_lower = query.lower()
         results = [
             {
-                "score": p.get("post_text", "").lower().count(q),
-                **{k: v for k, v in p.items() if k != "doc_embedding"},
+                "score": post.get("post_text", "").lower().count(query_lower),
+                **{key: val for key, val in post.items() if key != "doc_embedding"},
             }
-            for p in self.posts
-            if q in p.get("post_text", "").lower()
+            for post in self.posts
+            if query_lower in post.get("post_text", "").lower()
         ]
-        ranked = sorted(results, key=lambda r: r.get("score", 0.0), reverse=True)
+        ranked = sorted(results, key=lambda result: result.get("score", 0.0), reverse=True)
         return ranked[:top_k]
 
     def search(self, input_data: list[str] | str, top_k: int = TOP_K_DEFAULT) -> list[dict]:
@@ -157,7 +157,7 @@ class SemanticSearcher:
             raise
         hits = response["hits"]["hits"]
         results = [{"score": hit["_score"], **hit["_source"]} for hit in hits]
-        results.sort(key=lambda r: r.get("score", 0.0), reverse=True)
+        results.sort(key=lambda result: result.get("score", 0.0), reverse=True)
         logger.info(f"Found {len(results)} similar documents (top_k={top_k}, size={size}).")
         return results
 
@@ -202,15 +202,15 @@ class InMemorySemanticSearcher:
         filters: list[dict] | None = None,
     ) -> list[dict]:
         """Score all posts by cosine similarity and return the top_k results."""
-        q = embedding / (np.linalg.norm(embedding) or 1)
-        scores = self.embeddings_norm @ q
+        query_embedding = embedding / (np.linalg.norm(embedding) or 1)
+        scores = self.embeddings_norm @ query_embedding
         top_indices = np.argsort(scores)[::-1][:top_k]
         results = []
         for i in top_indices:
-            result = {k: v for k, v in self.posts[i].items() if k != "doc_embedding"}
+            result = {key: val for key, val in self.posts[i].items() if key != "doc_embedding"}
             result["score"] = float(scores[i])
             results.append(result)
-        results.sort(key=lambda r: r.get("score", 0.0), reverse=True)
+        results.sort(key=lambda result: result.get("score", 0.0), reverse=True)
         return results
 
     def search(self, input_data: list[str] | np.ndarray, top_k: int = TOP_K_DEFAULT) -> list[dict]:
@@ -289,7 +289,7 @@ class TopicSearchArgs(BaseModel):
 
 
 def run_search_by_text(args: TextSearchArgs) -> list[dict]:
-    """Powers the search bar in the demo app. Dispatches to keyword or semantic search based on searcher type."""
+    """Powers the search bar in the demo app. Dispatches to keyword or semantic search."""
     if hasattr(args.searcher, "embedding_model"):
         embedding = args.searcher.embedding_model.encode(args.query, convert_to_numpy=True)
         return args.searcher.search_similar_documents(embedding, top_k=args.top_k)

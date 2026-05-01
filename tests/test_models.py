@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pytest
-
 from src.models import PostDocument
 
 BASE = {
@@ -63,14 +61,3 @@ class TestPreprocessText:
     def test_empty_text_returns_empty(self) -> None:
         post = make_post(post_text="")
         assert post.preprocess_text() == ""
-
-
-class TestPreprocessSentences:
-    def test_splits_on_period(self) -> None:
-        post = make_post(post_text="First sentence. Second sentence.")
-        sentences = post.preprocess_sentences()
-        assert len(sentences) == 2
-
-    def test_single_sentence_returns_one_item(self) -> None:
-        post = make_post(post_text="Just one sentence")
-        assert len(post.preprocess_sentences()) == 1

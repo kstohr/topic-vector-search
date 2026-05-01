@@ -146,25 +146,28 @@ def evaluate_topics(args: TopicEvalArgs) -> pd.DataFrame:
     keywords = args.keywords
 
     assigned_by_topic = {
-        tid: set(assignments.loc[assignments["topic_id"] == tid, "post_id"]) for tid in labels
+        topic_id: set(assignments.loc[assignments["topic_id"] == topic_id, "post_id"])
+        for topic_id in labels
     }
 
     rows = []
     for topic_id, info in sorted(labels.items()):
-        emb = np.array(topic_embeddings[topic_id], dtype=np.float32)
+        topic_embedding = np.array(topic_embeddings[topic_id], dtype=np.float32)
         assigned = assigned_by_topic.get(topic_id, set())
-        kws = keywords.get(topic_id, [])[:10] if keywords else []
+        topic_keywords = keywords.get(topic_id, [])[:10] if keywords else []
 
         # Next run search for evaluation
-        search_results = run_search_by_topic(TopicSearchArgs(embedding=emb, searcher=searcher, top_k=args.eval_k))
+        search_results = run_search_by_topic(
+            TopicSearchArgs(embedding=topic_embedding, searcher=searcher, top_k=args.eval_k)
+        )
 
         # Display general scores
-        scores = [r["score"] for r in search_results]
+        scores = [result["score"] for result in search_results]
 
-        eval: TopicSearchMetrics = compute_topic_search_eval_metrics(
+        metrics: TopicSearchMetrics = compute_topic_search_eval_metrics(
             args=TopicSearchMetricArgs(
                 dataset_size=args.corpus_size,
-                retrieved_ids=[r.get("post_id", "") for r in search_results],
+                retrieved_ids=[result.get("post_id", "") for result in search_results],
                 topic_post_ids=assigned,
                 recall_k=DEFAULT_RECALL_K,
                 precision_k=DEFAULT_PRECISION_K,
@@ -174,10 +177,10 @@ def evaluate_topics(args: TopicEvalArgs) -> pd.DataFrame:
         # define the row for this topic
         row = TopicEvalRow(
             topic=info["label"],
-            keywords=", ".join(kws),
+            keywords=", ".join(topic_keywords),
             assigned_posts=len(assigned),
             avg_search_score=np.mean(scores) if scores else 0.0,
-            **eval.model_dump(),
+            **metrics.model_dump(),
         )
         rows.append(row.model_dump())
 
@@ -223,10 +226,10 @@ def build_search_result_rows(args: SearchResultRowsArgs) -> list[SearchResultRow
     id_to_label = {tid: v["label"] for tid, v in args.labels.items()}
 
     rows = []
-    for r in args.results:
-        pid = r.get("post_id", "")
-        post = args.posts_by_id.get(pid, {})
-        text = r.get("post_text", "").strip()
+    for result in args.results:
+        post_id = result.get("post_id", "")
+        post = args.posts_by_id.get(post_id, {})
+        text = result.get("post_text", "").strip()
         caption = (post.get("image_caption") or "").strip()
 
         if text:
@@ -237,17 +240,19 @@ def build_search_result_rows(args: SearchResultRowsArgs) -> list[SearchResultRow
             display_text = "[image — no caption yet]"
 
         topic_label = ""
-        match = args.assignments.loc[args.assignments["post_id"] == pid, "topic_id"]
+        match = args.assignments.loc[args.assignments["post_id"] == post_id, "topic_id"]
         if len(match):
-            tid = int(match.values[0])
-            topic_label = id_to_label.get(tid, f"Topic {tid}")
+            topic_id = int(match.values[0])
+            topic_label = id_to_label.get(topic_id, f"Topic {topic_id}")
 
-        rows.append(SearchResultRow(
-            score=round(r.get("score", 0), 3),
-            post=display_text,
-            topic=topic_label,
-            image_url=post.get("image_url", ""),
-            post_id=pid,
-        ))
+        rows.append(
+            SearchResultRow(
+                score=round(result.get("score", 0), 3),
+                post=display_text,
+                topic=topic_label,
+                image_url=post.get("image_url", ""),
+                post_id=post_id,
+            )
+        )
 
     return rows

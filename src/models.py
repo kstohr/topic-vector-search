@@ -4,15 +4,11 @@ import re
 from datetime import UTC, datetime
 
 import emoji
-import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from sentence_transformers import SentenceTransformer
-
-from src.config import EMBEDDING_MODEL_NAME
 
 
 class Post(BaseModel):
-    """Raw, unprocessed social media post as generated or ingested."""
+    """Raw unprocessed social media post as generated or ingested."""
 
     post_id: str
     post_author: str
@@ -34,6 +30,25 @@ class Post(BaseModel):
             dt = dt.astimezone(UTC)
         return dt.isoformat()
 
+
+class PostDocument(Post):
+    """
+    Structured post document. Inherits all fields from Post, with additional fields for downstream modeling.
+    - Deconstructs unstructured text and elements of the
+    raw post into structured fields.
+    - Methods to preprocess text
+        - emoji conversion
+        - lowercasing,
+        - punctuation stripping
+        - remove extra whitespace
+    Note: These methods may vary based on the documents being processed and the downstream modeling task.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    image_caption: str | None = None
+    doc_embedding: list[float] = Field(default_factory=list)
+
     def preprocess_text(self, text: str | None = None) -> str:
         """
         Passed to model pipeline. Standard pre-processing of text after cleaning,
@@ -48,7 +63,13 @@ class Post(BaseModel):
         text = re.sub(r"\s+", " ", text).strip()
         return text
 
-    # Commented out due to SpaCy dependency
+    ##############################
+    # Commented out for simplicity and due to SpaCy dependency
+    # Try this out if you have time.
+    # Run: `uv add spacy` and `python -m spacy download en_core_web_sm` to use
+    # the sentence splitting method below.
+    # Helpful for longer documents where you want to embed sentences instead of the whole text.
+    ##############################
     # async def preprocess_sentences(self) -> list[str]:
     #     """
     #     Splits the text into sentences. Pre-processes each sentence. Returns a list
@@ -63,23 +84,3 @@ class Post(BaseModel):
     #     for sent in split_text:
     #         sentences.append(preprocess_text(sent))
     #     return sentences
-
-    def preprocess_sentences(self) -> list[str]:
-        """
-        Splits the text into sentences using regex (Normally SpaCy).
-        Pre-processes the input text
-        by lowercasing, removing numbers, extra whitespaces, and replacing emojis
-        with their textual descriptions.
-        """
-        split_text = re.split(r"(?<=[.!?])\s+", self.post_text)
-        sentences = [self.preprocess_text(sent) for sent in split_text if sent.strip()]
-        return sentences
-
-
-class PostDocument(Post):
-    """Processed post document with image caption and embedding populated by preprocess.py."""
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    image_caption: str | None = None
-    doc_embedding: list[float] = Field(default_factory=list)

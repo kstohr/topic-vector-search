@@ -13,16 +13,16 @@ INDEX_BODY = {
     "settings": {"number_of_shards": 1},
     "mappings": {
         "properties": {
-            "post_id":     {"type": "keyword"},
+            "post_id": {"type": "keyword"},
             "post_author": {"type": "keyword"},
-            "created_at":  {"type": "date"},
+            "created_at": {"type": "date"},
             "modified_at": {"type": "date"},
-            "post_text":   {"type": "text"},
+            "post_text": {"type": "text"},
             "doc_embedding": {
-                "type":       "dense_vector",
-                "dims":       384,
-                "index":      True,
-                "similarity": "cosine", # Distance metric
+                "type": "dense_vector",
+                "dims": 384,
+                "index": True,
+                "similarity": "cosine",  # Distance metric
             },
         }
     },

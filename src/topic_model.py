@@ -48,7 +48,7 @@ from src.config import (
     EMBEDDING_MODEL_NAME as EMBEDDING_MODEL,
 )
 from src.models import PostDocument
-from src.preprocess import embedding_text
+from src.preprocess import extract_embedding_text
 
 logger = logging.getLogger(__name__)
 
@@ -194,17 +194,19 @@ class TopicModeler:
 
         texts, embeddings, post_ids = [], [], []
         for post_id, doc in self.doc_index.items():
-            raw = doc.model_dump(mode="json")
-            text = embedding_text(raw)
-            emb = raw.get("doc_embedding", [])
-            if not text or not emb:
+            # for training extract the text as it was embedded (i.e. cleaned and enriched with emojis converted to text, captions, etc.),
+            # and the embedding from the document
+            text = extract_embedding_text(doc)
+            embedding = doc.doc_embedding
+            if not embedding:
                 continue
             texts.append(text)
-            embeddings.append(emb)
+            embeddings.append(embedding)
             post_ids.append(post_id)
 
         self._post_ids_for_training = post_ids
         self._texts_for_training = texts
+        # Embeddings were converted to lists for JSON serialization when stored in ES, now convert back to arrays for training
         embeddings_np = np.array(embeddings, dtype=np.float32)
         logger.info(f"Training on {len(texts)} posts.")
 
@@ -230,9 +232,9 @@ class TopicModeler:
             vectorizer_model=vectorizer,
             ctfidf_model=ClassTfidfTransformer(),
             representation_model=representation,
-            min_topic_size=10,
+            min_topic_size=5,
             n_gram_range=(1, 3),
-            top_n_words=10,
+            top_n_words=3,
             calculate_probabilities=True,
             verbose=True,
         )
@@ -252,7 +254,8 @@ class TopicModeler:
 
         valid_ids = [int(t) for t in self.topic_model.get_topic_info()["Topic"] if int(t) != -1]
         keywords_by_topic = {
-            tid: [w for w, _ in self.topic_model.get_topic(tid)[:10]] for tid in valid_ids
+            topic_id: [word for word, _ in self.topic_model.get_topic(topic_id)[:10]]
+            for topic_id in valid_ids
         }
 
         self._save_model()
@@ -293,21 +296,21 @@ class TopicModeler:
         llm_labels: dict[int, str] = {}
         aspects = getattr(self.topic_model, "topic_aspects_", {}) or {}
         if "LLM" in aspects:
-            for tid, label_list in aspects["LLM"].items():
+            for topic_id, label_list in aspects["LLM"].items():
                 if not label_list:
                     continue
                 first = label_list[0]
                 # BERTopic returns either a plain string or a (str, score) tuple
                 raw = first[0] if isinstance(first, (list, tuple)) else str(first)
                 raw = re.sub(r"^topic\s*:\s*", "", raw, flags=re.IGNORECASE).strip()
-                llm_labels[int(tid)] = raw
+                llm_labels[int(topic_id)] = raw
 
         labels_out: dict[str, dict] = {}
-        for tid in sorted(valid_ids):
-            kws = keywords_by_topic[tid]
-            label = llm_labels.get(tid) or " · ".join(kws[:3])
-            labels_out[str(tid)] = {"label": label}
-            logger.info(f"  Topic {tid:2d}: {label}  [{', '.join(kws[:5])}]")
+        for topic_id in sorted(valid_ids):
+            topic_keywords = keywords_by_topic[topic_id]
+            label = llm_labels.get(topic_id) or " · ".join(topic_keywords[:3])
+            labels_out[str(topic_id)] = {"label": label}
+            logger.info(f"  Topic {topic_id:2d}: {label}  [{', '.join(topic_keywords[:5])}]")
 
         with open(self.output_path / "topic_labels.json", "w") as f:
             json.dump(labels_out, f, indent=2, ensure_ascii=False)
@@ -319,21 +322,28 @@ class TopicModeler:
         if topic_embs is None:
             return
         topic_embedding_map = {
-            tid: topic_embs[tid + 1].tolist()
-            for tid in valid_ids
-            if (tid + 1) < len(topic_embs)
+            topic_id: topic_embs[topic_id + 1].tolist()
+            for topic_id in valid_ids
+            if (topic_id + 1) < len(topic_embs)
         }
         with open(self.output_path / "topic_embeddings.json", "w") as f:
-            json.dump({str(k): v for k, v in topic_embedding_map.items()}, f)
+            json.dump(
+                {str(topic_id): embedding for topic_id, embedding in topic_embedding_map.items()},
+                f,
+            )
 
     def _save_keyword_embeddings(self, keywords_by_topic: dict[int, list[str]]) -> None:
         """Write topic_keyword_embeddings.json by encoding each topic's top keywords."""
         topic_keyword_embs = {
-            tid: self.embedding_model.encode(" ".join(kws[:10]), convert_to_numpy=True).tolist()
-            for tid, kws in keywords_by_topic.items()
+            topic_id: self.embedding_model.encode(
+                " ".join(topic_keywords[:10]), convert_to_numpy=True
+            ).tolist()
+            for topic_id, topic_keywords in keywords_by_topic.items()
         }
         with open(self.output_path / "topic_keyword_embeddings.json", "w") as f:
-            json.dump({str(k): v for k, v in topic_keyword_embs.items()}, f)
+            json.dump(
+                {str(topic_id): embedding for topic_id, embedding in topic_keyword_embs.items()}, f
+            )
 
     def generate_visualizations(self) -> None:
         """Write BERTopic HTML visualizations to output_path."""
@@ -357,11 +367,11 @@ class TopicModeler:
     # ── Main pipeline ──────────────────────────────────────────────────────
 
     def run(self) -> None:
-        """Run the full topic modeling pipeline: load → train → visualize → save."""
+        """Run the full topic modeling pipeline: load → train → save → visualize."""
         self.retrieve_post_documents()
         self.train_topic_model()
-        self.generate_visualizations()
         self.store_model_data()
+        self.generate_visualizations()
 
 
 if __name__ == "__main__":

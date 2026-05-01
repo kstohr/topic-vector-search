@@ -22,9 +22,10 @@ dependencies = [
     "httpx>=0.27",
     "datasets>=2.0",
     "Pillow>=10.0",
+    "ruff>=0.15.12",
     "torch>=2.0,<2.3",
     "torchvision>=0.17,<0.18",
-    "ruff>=0.15.12",
+    "safetensors>=0.4",
 ]
 
 [dependency-groups]
