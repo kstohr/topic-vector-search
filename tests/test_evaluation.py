@@ -5,12 +5,16 @@ import pandas as pd
 import pytest
 
 from src.evaluation import (
+    ComputePrecisionResp,
+    ComputeRecallResp,
     SearchResultRow,
     SearchResultRowsArgs,
     TopicEvalArgs,
     TopicSearchMetricArgs,
     build_search_result_rows,
+    compute_precision_at_k,
     compute_random_baseline,
+    compute_recall_at_k,
     compute_topic_search_eval_metrics,
     evaluate_topics,
 )
@@ -18,6 +22,74 @@ from src.evaluation import (
 
 def test_compute_random_baseline_returns_topic_fraction() -> None:
     assert compute_random_baseline(topic_size=25, dataset_size=100) == 0.25
+
+
+def test_compute_random_baseline_returns_zero_when_dataset_empty() -> None:
+    assert compute_random_baseline(topic_size=5, dataset_size=0) == 0.0
+
+
+def test_compute_precision_at_k_counts_hits_in_top_k() -> None:
+    result = compute_precision_at_k(
+        retrieved_ids=["p1", "p2", "p3", "p4"],
+        topic_post_ids={"p2", "p4", "p9"},
+        k=3,
+    )
+
+    assert result.hits == 1
+    assert result.precision == pytest.approx(1 / 3)
+
+
+def test_compute_precision_at_k_uses_all_retrieved_if_less_than_k() -> None:
+    result = compute_precision_at_k(
+        retrieved_ids=["p1", "p2"],
+        topic_post_ids={"p1", "p3"},
+        k=10,
+    )
+
+    assert result.hits == 1
+    assert result.precision == pytest.approx(1 / 2)
+
+
+def test_compute_precision_at_k_returns_zero_for_empty_retrieval() -> None:
+    result = compute_precision_at_k(
+        retrieved_ids=[],
+        topic_post_ids={"p1", "p2"},
+        k=5,
+    )
+
+    assert result == ComputePrecisionResp(precision=0.0, hits=0)
+
+
+def test_compute_recall_at_k_counts_hits_against_all_relevant_posts() -> None:
+    result = compute_recall_at_k(
+        retrieved_ids=["a", "b", "c", "d"],
+        topic_post_ids={"b", "d", "z", "y"},
+        k=3,
+    )
+
+    assert result.hits == 1
+    assert result.recall == pytest.approx(1 / 4)
+
+
+def test_compute_recall_at_k_returns_zero_for_empty_topic_posts() -> None:
+    result = compute_recall_at_k(
+        retrieved_ids=["a", "b", "c"],
+        topic_post_ids=set(),
+        k=3,
+    )
+
+    assert result == ComputeRecallResp(recall=0.0, hits=0)
+
+
+def test_compute_recall_at_k_uses_top_k_only() -> None:
+    result = compute_recall_at_k(
+        retrieved_ids=["hit1", "miss", "hit2", "hit3"],
+        topic_post_ids={"hit1", "hit2", "hit3"},
+        k=2,
+    )
+
+    assert result.hits == 1
+    assert result.recall == pytest.approx(1 / 3)
 
 
 def test_compute_topic_search_eval_metrics_counts_precision_recall_and_baseline() -> None:

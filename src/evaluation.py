@@ -1,19 +1,21 @@
 """
-Evaluation metrics for topic search:
+TOPIC SEARCH EVALUATION METRICS
 
-- Evaluation-k (e.g., K=100): number of results returned by search.
-This is passed to the "size" parameter of the search query and determines the
-total number of results returned by search for evaluation. This should be large
-enough to capture all relevant posts for fair evaluation, but not so large that
-it includes a lot of noise. Should be tuned based on corpus size and typical
-search depth in your application.
+- Evaluation-k (e.g., k=100; *retrieval depth*)
+How many results to retrieve for evaluation. This is passed to the "size"
+parameter of the search query and determines the total number of results
+returned by search for evaluation. This should be large enough to capture all
+relevant posts for fair evaluation, but not so large that it includes a lot of
+noise. Should be tuned based on corpus size and typical search depth in your application.
 
-- Recall@K: coverage of topic within top-K results (e.g., K=100)
-How many of the assigned posts are retrieved by search. Should be large enough
-to capture all relevant posts for fair evaluation. Here we set it to a value
-greater than the number of posts assigned to most topics.
+- Recall@k: coverage of topic within top-K results (e.g., k=100; **evaluation
+  cutoff**)
+How many of the posts assigned to this topic appear in the top K results; where
+"k" is set to a value that captures the typical depth returned by search
+results. Should be large enough to capture all relevant posts for fair
+evaluation. Here we set it to a value greater than the number of posts assigned to a typical topic.
 
-- Precision@K: quality of top-K results (e.g., K=8)
+- Precision@k: quality of top-K results (e.g., k=8, **display cutoff**)
 How many of the assigned posts appear in the top K results; where "k" is set to
 a typical value for search results displayed before pagination (e.g., 8 or 10).
 
@@ -34,13 +36,72 @@ from pydantic import BaseModel, ConfigDict, PositiveInt
 
 from src.search import TopicSearchArgs, run_search_by_topic
 
-DEFAULT_EVAL_K = 100
-DEFAULT_RECALL_K = 100
-DEFAULT_PRECISION_K = 8
+DEFAULT_EVAL_K = 100  # Retrieval depth
+DEFAULT_RECALL_K = 100  # Evaluation cutoff
+DEFAULT_PRECISION_K = 8  # Display cutoff
 
 
-def compute_random_baseline(topic_size: int, dataset_size: int):
-    """Computes the expected precision of a random baseline for a given topic."""
+class ComputePrecisionResp(BaseModel):
+    """Response from compute_precision_at_k."""
+
+    precision: float
+    hits: int
+
+
+def compute_precision_at_k(
+    retrieved_ids: list[str],
+    topic_post_ids: set[str],
+    k: int,
+) -> ComputePrecisionResp:
+    """Computes Precision@K: the proportion of the top-K retrieved posts that
+    are relevant to the topic.
+    """
+    # Retrieval may return < K results. This may be less than K
+    top_k_ids = retrieved_ids[:k]
+    if not top_k_ids:
+        return ComputePrecisionResp(precision=0.0, hits=0)
+    hits = sum(pid in topic_post_ids for pid in top_k_ids)
+    return ComputePrecisionResp(
+        precision=hits / len(top_k_ids),
+        hits=hits,
+    )
+
+
+class ComputeRecallResp(BaseModel):
+    """Response from compute_recall_at_k."""
+
+    recall: float
+    hits: int
+
+
+def compute_recall_at_k(
+    retrieved_ids: list[str],
+    topic_post_ids: set[str],
+    k: int,
+) -> ComputeRecallResp:
+    """
+    Computes Recall@K: the proportion of relevant posts that are retrieved in
+    the top-K results.
+    """
+    top_k_ids = retrieved_ids[:k]
+    if not topic_post_ids:
+        return ComputeRecallResp(recall=0.0, hits=0)
+    hits = sum(pid in topic_post_ids for pid in top_k_ids)
+    return ComputeRecallResp(
+        recall=hits / len(topic_post_ids),
+        hits=hits,
+    )
+
+
+def compute_random_baseline(
+    topic_size: int,
+    dataset_size: int,
+) -> float:
+    """
+    Computes the expected precision of a random baseline for a given topic.
+    """
+    if dataset_size == 0:
+        return 0.0  # Avoid division by zero.
     return topic_size / dataset_size
 
 
@@ -76,27 +137,35 @@ def compute_topic_search_eval_metrics(args: TopicSearchMetricArgs) -> TopicSearc
 
     Assumes retrieved_ids are ordered by relevance (highest score first).
     """
-    # --- Precision@K ---
-    top_precision_k = args.retrieved_ids[: args.precision_k]
-    precision_hits = sum(pid in args.topic_post_ids for pid in top_precision_k)
-    precision_at_k = precision_hits / args.precision_k
-
-    # --- Recall@K ---
-    top_recall_k = args.retrieved_ids[: args.recall_k]
-    recall_hits = sum(pid in args.topic_post_ids for pid in top_recall_k)
-    recall_at_k = recall_hits / len(args.topic_post_ids)
 
     # --- Baseline precision ---
-    baseline = compute_random_baseline(len(args.topic_post_ids), args.dataset_size)
+    baseline = compute_random_baseline(
+        len(args.topic_post_ids),
+        args.dataset_size,
+    )
+
+    # --- Precision@K ---
+    precision_at_k = compute_precision_at_k(
+        args.retrieved_ids,
+        args.topic_post_ids,
+        args.precision_k,
+    )
+
+    # --- Recall@K ---
+    recall_at_k = compute_recall_at_k(
+        args.retrieved_ids,
+        args.topic_post_ids,
+        args.recall_k,
+    )
 
     return TopicSearchMetrics(
-        precision_at_k=precision_at_k,
-        recall_at_k=recall_at_k,
+        precision_at_k=precision_at_k.precision,
+        recall_at_k=recall_at_k.recall,
         baseline=baseline,
         num_posts_assigned_to_topic=len(args.topic_post_ids),
         num_retrieved_by_search=len(args.retrieved_ids),
-        precision_hits=precision_hits,
-        recall_hits=recall_hits,
+        precision_hits=precision_at_k.hits,
+        recall_hits=recall_at_k.hits,
     )
 
 
@@ -221,7 +290,7 @@ class SearchResultRow(BaseModel):
 def build_search_result_rows(args: SearchResultRowsArgs) -> list[SearchResultRow]:
     """
     Join search results with topic assignments and post metadata.
-    Returns a list of SearchResultRow ready for display or ranking.
+    Returns a list of SearchResultRow ready for display in the demo app.
     """
     id_to_label = {tid: v["label"] for tid, v in args.labels.items()}
 
