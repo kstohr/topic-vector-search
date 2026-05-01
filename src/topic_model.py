@@ -153,9 +153,9 @@ class TopicModeler:
             vectorizer_model=vectorizer,
             ctfidf_model=ClassTfidfTransformer(),
             representation_model=representation,
-            min_topic_size=5,
+            min_topic_size=10,
             n_gram_range=(1, 3),
-            top_n_words=3,
+            top_n_words=10,
             calculate_probabilities=True,
             verbose=True,
         )
