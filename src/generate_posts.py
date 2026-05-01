@@ -1,5 +1,12 @@
 """
-Generate posts on six (7) example topics.
+====================
+GENERATE POSTS
+====================
+
+Generate synthetic posts on seven (7) example topics. This calls an LLM (in this
+case, Ollama) to generate engaging social media posts that include relevant
+emojis and keywords. The generated posts are saved to sample_posts.json and
+serve as the dataset for the topic modeling and search pipeline.
 """
 
 import json
@@ -12,7 +19,7 @@ from pathlib import Path
 from openai import OpenAI
 
 from src.config import OLLAMA_MODEL, OLLAMA_URL, REPO
-from src.models import Post
+from src.data_models import Post
 
 ASSETS_DIR = REPO / "assets"
 
@@ -167,13 +174,17 @@ class PostGenerator:
         for topic, keywords in TOPICS.items():
             logger.info(f"Generating posts for topic: {topic}")
             texts = self._call_llm_for_topic(topic, keywords)
-            posts.extend(_make_post(t, topic) for t in texts)
+            posts.extend(_make_post(text, topic) for text in texts)
         return posts
 
     def generate_image_posts(self) -> list[Post]:
         """Create one image-only post per image file found in assets/."""
         image_extensions = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
-        images = [p for p in ASSETS_DIR.iterdir() if p.suffix.lower() in image_extensions]
+        images = [
+            image_path
+            for image_path in ASSETS_DIR.iterdir()
+            if image_path.suffix.lower() in image_extensions
+        ]
         logger.info(f"Creating {len(images)} image posts from {ASSETS_DIR.name}/.")
         return [_make_image_post(img) for img in sorted(images)]
 
@@ -181,13 +192,13 @@ class PostGenerator:
         """Generate random off-topic posts across distinct subjects."""
         logger.info(f"Generating {RANDOM_POST_COUNT} random posts.")
         texts = self._call_llm_for_random()
-        return [_make_post(t, "noise") for t in texts]
+        return [_make_post(text, "noise") for text in texts]
 
     def _call_llm_for_topic(self, topic: str, keywords: list[str]) -> list[str]:
         """Call the LLM to generate posts for a single topic. Returns a list of post strings."""
         prompt = f"""
         Generate a list of {POSTS_PER_TOPIC} unique social media posts about {topic}.
-        Include relevant emojis and keywords such as {','.join(keywords)}.
+        Include relevant emojis and keywords such as {",".join(keywords)}.
         Make each post engaging and relevant to the topic. Do not repeat the content of posts.
         Posts content should be unique. Vary the length of posts from one sentence to 10 sentences.
         Posts on more serious topics should be longer and do not need to include emojis.
@@ -200,7 +211,7 @@ class PostGenerator:
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a helpful assistant that generates creative social media posts.",
+                    "content": "You are a helpful assistant that generates creative social media posts.",  # noqa: E501
                 },
                 {"role": "user", "content": prompt},
             ],
@@ -209,7 +220,9 @@ class PostGenerator:
         )
         if response.choices[0].message.content is None:
             raise ValueError(f"LLM returned no content for topic '{topic}'.")
-        return [p.strip() for p in response.choices[0].message.content.split("\n") if p.strip()]
+        return [
+            line.strip() for line in response.choices[0].message.content.split("\n") if line.strip()
+        ]
 
     def _call_llm_for_random(self) -> list[str]:
         """Call the LLM to generate random off-topic posts. Returns a list of post strings."""
@@ -240,14 +253,18 @@ class PostGenerator:
         )
         if response.choices[0].message.content is None:
             raise ValueError("LLM returned no content for random posts.")
-        return [p.strip() for p in response.choices[0].message.content.split("\n") if p.strip()]
+        return [
+            line.strip() for line in response.choices[0].message.content.split("\n") if line.strip()
+        ]
 
     def run(self) -> None:
         """Generate all posts and write them to sample_posts.json."""
-        posts = self.generate_topic_posts() + self.generate_random_posts() + self.generate_image_posts()
+        posts = (
+            self.generate_topic_posts() + self.generate_random_posts() + self.generate_image_posts()
+        )
         output_path = REPO / "sample_posts.json"
         with open(output_path, "w") as f:
-            json.dump([p.model_dump(mode="json") for p in posts], f, indent=4)
+            json.dump([post.model_dump(mode="json") for post in posts], f, indent=4)
         logger.info(f"Saved {len(posts)} posts to {output_path.name}.")
 
 

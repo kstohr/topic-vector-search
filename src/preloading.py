@@ -1,4 +1,10 @@
-"""Workshop pre-loading: index raw posts into Elasticsearch for keyword search."""
+"""
+====================
+PRELOAD RAW SAMPLE POSTS INTO ELASTICSEARCH
+====================
+Workshop pre-loading: index raw posts into Elasticsearch for keyword search.
+
+"""
 
 import json
 import logging
@@ -7,36 +13,36 @@ from pathlib import Path
 from elasticsearch import Elasticsearch, helpers
 
 from src.config import ELASTICSEARCH_URL, REPO
+from src.data_models import PostDocument
 from src.es_index import INDEX_NAME, create_index
-from src.models import PostDocument
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
 logger = logging.getLogger(__name__)
 
 
-def load_posts(path: Path) -> list[PostDocument]:
-    """Load and validate posts from a JSON file."""
+def load_postdocs(path: Path) -> list[PostDocument]:
+    """Load and validate post documents from a JSON file."""
     with open(path) as f:
         raw = json.load(f)
-    posts = [PostDocument(**p) for p in raw]
-    logger.info(f"Loaded {len(posts)} posts from {path.name}.")
-    return posts
+    postdocs = [PostDocument(**p) for p in raw]
+    logger.info(f"Loaded {len(postdocs)} postdocs from {path.name}.")
+    return postdocs
 
 
-def index_posts(client: Elasticsearch, posts: list[PostDocument]) -> None:
-    """Bulk-index posts into Elasticsearch."""
+def index_postdocs(client: Elasticsearch, postdocs: list[PostDocument]) -> None:
+    """Bulk-index postdocs into Elasticsearch."""
     actions = [
         {
             "_index": INDEX_NAME,
-            "_id": post.post_id,
-            "_source": post.model_dump(mode="json"),
+            "_id": postdoc.post_id,
+            "_source": postdoc.model_dump(mode="json"),
         }
-        for post in posts
+        for postdoc in postdocs
     ]
     success, failed = helpers.bulk(client, actions)
-    logger.info(f"Indexed {success} posts into '{INDEX_NAME}'.")
+    logger.info(f"Indexed {success} postdocs into '{INDEX_NAME}'.")
     if failed:
-        logger.error(f"Failed to index {len(failed)} posts.")
+        logger.error(f"Failed to index {len(failed)} postdocs.")
 
 
 def run() -> None:
@@ -49,8 +55,8 @@ def run() -> None:
         return
 
     create_index(client)
-    posts = load_posts(REPO / "sample_posts.json")
-    index_posts(client, posts)
+    postdocs = load_postdocs(REPO / "sample_posts.json")
+    index_postdocs(client, postdocs)
     logger.info("Pre-loading complete. Keyword search is ready in the demo app.")
     logger.info("Run 'uv run python -m src.preprocess' to add embeddings for semantic search.")
 

@@ -1,19 +1,25 @@
 """
-Evaluation metrics for topic search:
+====================
+TOPIC SEARCH EVALUATION METRICS
+====================
 
-- Evaluation-k (e.g., K=100): number of results returned by search.
-This is passed to the "size" parameter of the search query and determines the
-total number of results returned by search for evaluation. This should be large
-enough to capture all relevant posts for fair evaluation, but not so large that
-it includes a lot of noise. Should be tuned based on corpus size and typical
-search depth in your application.
+Below are the key metrics we compute to evaluate the quality of our topic search results:
 
-- Recall@K: coverage of topic within top-K results (e.g., K=100)
-How many of the assigned posts are retrieved by search. Should be large enough
-to capture all relevant posts for fair evaluation. Here we set it to a value
-greater than the number of posts assigned to most topics.
+- Evaluation-k (e.g., k=100; *retrieval depth*)
+How many results to retrieve for evaluation. This is passed to the "size"
+parameter of the search query and determines the total number of results
+returned by search for evaluation. This should be large enough to capture all
+relevant posts for fair evaluation, but not so large that it includes a lot of
+noise. Should be tuned based on corpus size and typical search depth in your application.
 
-- Precision@K: quality of top-K results (e.g., K=8)
+- Recall@k: coverage of topic within top-K results (e.g., k=100; **evaluation
+  cutoff**)
+How many of the posts assigned to this topic appear in the top K results; where
+"k" is set to a value that captures the typical depth returned by search
+results. Should be large enough to capture all relevant posts for fair
+evaluation. Here we set it to a value greater than the number of posts assigned to a typical topic.
+
+- Precision@k: quality of top-K results (e.g., k=8, **display cutoff**)
 How many of the assigned posts appear in the top K results; where "k" is set to
 a typical value for search results displayed before pagination (e.g., 8 or 10).
 
@@ -26,6 +32,7 @@ understand how much better our search is compared to random chance. We compute
 this for each topic and include it in the evaluation metrics for context.
 """
 
+import logging
 from typing import Any
 
 import numpy as np
@@ -34,14 +41,75 @@ from pydantic import BaseModel, ConfigDict, PositiveInt
 
 from src.search import TopicSearchArgs, run_search_by_topic
 
-DEFAULT_EVAL_K = 100
-DEFAULT_RECALL_K = 100
-DEFAULT_PRECISION_K = 8
+DEFAULT_EVAL_K = 100  # Retrieval depth
+DEFAULT_RECALL_K = 100  # Evaluation cutoff
+DEFAULT_PRECISION_K = 8  # Display cutoff
 
 
-def compute_random_baseline(topic_size: int, dataset_size: int):
-    """Computes the expected precision of a random baseline for a given topic."""
-    return topic_size / dataset_size
+logger = logging.getLogger(__name__)
+
+
+class ComputePrecisionResp(BaseModel):
+    """Response from compute_precision_at_k."""
+
+    precision: float
+    hits: int
+
+
+def compute_precision_at_k(
+    retrieved_ids: list[str],
+    topic_post_ids: set[str],
+    k: int,
+) -> ComputePrecisionResp:
+    """Computes Precision@K: the proportion of the top-K retrieved posts that
+    are relevant to the topic.
+    """
+    logger.info(f"Computing Precision@{k}")
+    ### EXERCISE ###
+    # Compute how many of the top-K retrieved post IDs are in the set of topic_post_ids (i.e., hits)
+    return ComputePrecisionResp(
+        precision=0.0,  # Replace with computed precision
+        hits=0,  # Replace with computed hits
+    )
+
+
+class ComputeRecallResp(BaseModel):
+    """Response from compute_recall_at_k."""
+
+    recall: float
+    hits: int
+
+
+def compute_recall_at_k(
+    retrieved_ids: list[str],
+    topic_post_ids: set[str],
+    k: int,
+) -> ComputeRecallResp:
+    """
+    Computes Recall@K: the proportion of relevant posts that are retrieved in
+    the top-K results.
+    """
+    logger.info(f"Computing Recall@{k}")
+    ### EXERCISE ###
+    # Compute how many of the topic_post_ids are in the top-K retrieved post IDs (i.e., hits)
+    return ComputeRecallResp(
+        recall=0.0,  # Replace with computed recall
+        hits=0,  # Replace with computed hits
+    )
+
+
+def compute_random_baseline(
+    topic_size: int,
+    dataset_size: int,
+) -> float:
+    """
+    Computes the expected precision of a random baseline for a given topic.
+    """
+    logger.info("Computing Baseline Precision")
+    ### EXERCISE ###
+    # Compute the expected precision of a random baseline for a topic of this
+    # size within the dataset
+    return 0.0  # Replace with computed baseline precision
 
 
 class TopicSearchMetricArgs(BaseModel):
@@ -76,27 +144,35 @@ def compute_topic_search_eval_metrics(args: TopicSearchMetricArgs) -> TopicSearc
 
     Assumes retrieved_ids are ordered by relevance (highest score first).
     """
-    # --- Precision@K ---
-    top_precision_k = args.retrieved_ids[: args.precision_k]
-    precision_hits = sum(pid in args.topic_post_ids for pid in top_precision_k)
-    precision_at_k = precision_hits / args.precision_k
-
-    # --- Recall@K ---
-    top_recall_k = args.retrieved_ids[: args.recall_k]
-    recall_hits = sum(pid in args.topic_post_ids for pid in top_recall_k)
-    recall_at_k = recall_hits / len(args.topic_post_ids)
 
     # --- Baseline precision ---
-    baseline = compute_random_baseline(len(args.topic_post_ids), args.dataset_size)
+    baseline = compute_random_baseline(
+        len(args.topic_post_ids),
+        args.dataset_size,
+    )
+
+    # --- Precision@K ---
+    precision_at_k = compute_precision_at_k(
+        args.retrieved_ids,
+        args.topic_post_ids,
+        args.precision_k,
+    )
+
+    # --- Recall@K ---
+    recall_at_k = compute_recall_at_k(
+        args.retrieved_ids,
+        args.topic_post_ids,
+        args.recall_k,
+    )
 
     return TopicSearchMetrics(
-        precision_at_k=precision_at_k,
-        recall_at_k=recall_at_k,
+        precision_at_k=precision_at_k.precision,
+        recall_at_k=recall_at_k.recall,
         baseline=baseline,
         num_posts_assigned_to_topic=len(args.topic_post_ids),
         num_retrieved_by_search=len(args.retrieved_ids),
-        precision_hits=precision_hits,
-        recall_hits=recall_hits,
+        precision_hits=precision_at_k.hits,
+        recall_hits=recall_at_k.hits,
     )
 
 
@@ -146,25 +222,28 @@ def evaluate_topics(args: TopicEvalArgs) -> pd.DataFrame:
     keywords = args.keywords
 
     assigned_by_topic = {
-        tid: set(assignments.loc[assignments["topic_id"] == tid, "post_id"]) for tid in labels
+        topic_id: set(assignments.loc[assignments["topic_id"] == topic_id, "post_id"])
+        for topic_id in labels
     }
 
     rows = []
     for topic_id, info in sorted(labels.items()):
-        emb = np.array(topic_embeddings[topic_id], dtype=np.float32)
+        topic_embedding = np.array(topic_embeddings[topic_id], dtype=np.float32)
         assigned = assigned_by_topic.get(topic_id, set())
-        kws = keywords.get(topic_id, [])[:10] if keywords else []
+        topic_keywords = keywords.get(topic_id, [])[:10] if keywords else []
 
         # Next run search for evaluation
-        search_results = run_search_by_topic(TopicSearchArgs(embedding=emb, searcher=searcher, top_k=args.eval_k))
+        search_results = run_search_by_topic(
+            TopicSearchArgs(embedding=topic_embedding, searcher=searcher, top_k=args.eval_k)
+        )
 
         # Display general scores
-        scores = [r["score"] for r in search_results]
+        scores = [result["score"] for result in search_results]
 
-        eval: TopicSearchMetrics = compute_topic_search_eval_metrics(
+        metrics: TopicSearchMetrics = compute_topic_search_eval_metrics(
             args=TopicSearchMetricArgs(
                 dataset_size=args.corpus_size,
-                retrieved_ids=[r.get("post_id", "") for r in search_results],
+                retrieved_ids=[result.get("post_id", "") for result in search_results],
                 topic_post_ids=assigned,
                 recall_k=DEFAULT_RECALL_K,
                 precision_k=DEFAULT_PRECISION_K,
@@ -174,10 +253,10 @@ def evaluate_topics(args: TopicEvalArgs) -> pd.DataFrame:
         # define the row for this topic
         row = TopicEvalRow(
             topic=info["label"],
-            keywords=", ".join(kws),
+            keywords=", ".join(topic_keywords),
             assigned_posts=len(assigned),
             avg_search_score=np.mean(scores) if scores else 0.0,
-            **eval.model_dump(),
+            **metrics.model_dump(),
         )
         rows.append(row.model_dump())
 
@@ -218,15 +297,15 @@ class SearchResultRow(BaseModel):
 def build_search_result_rows(args: SearchResultRowsArgs) -> list[SearchResultRow]:
     """
     Join search results with topic assignments and post metadata.
-    Returns a list of SearchResultRow ready for display or ranking.
+    Returns a list of SearchResultRow ready for display in the demo app.
     """
     id_to_label = {tid: v["label"] for tid, v in args.labels.items()}
 
     rows = []
-    for r in args.results:
-        pid = r.get("post_id", "")
-        post = args.posts_by_id.get(pid, {})
-        text = r.get("post_text", "").strip()
+    for result in args.results:
+        post_id = result.get("post_id", "")
+        post = args.posts_by_id.get(post_id, {})
+        text = result.get("post_text", "").strip()
         caption = (post.get("image_caption") or "").strip()
 
         if text:
@@ -237,17 +316,19 @@ def build_search_result_rows(args: SearchResultRowsArgs) -> list[SearchResultRow
             display_text = "[image — no caption yet]"
 
         topic_label = ""
-        match = args.assignments.loc[args.assignments["post_id"] == pid, "topic_id"]
+        match = args.assignments.loc[args.assignments["post_id"] == post_id, "topic_id"]
         if len(match):
-            tid = int(match.values[0])
-            topic_label = id_to_label.get(tid, f"Topic {tid}")
+            topic_id = int(match.values[0])
+            topic_label = id_to_label.get(topic_id, f"Topic {topic_id}")
 
-        rows.append(SearchResultRow(
-            score=round(r.get("score", 0), 3),
-            post=display_text,
-            topic=topic_label,
-            image_url=post.get("image_url", ""),
-            post_id=pid,
-        ))
+        rows.append(
+            SearchResultRow(
+                score=round(result.get("score", 0), 3),
+                post=display_text,
+                topic=topic_label,
+                image_url=post.get("image_url") or "",
+                post_id=post_id,
+            )
+        )
 
     return rows

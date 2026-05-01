@@ -1,4 +1,7 @@
 """
+====================
+PREPROCESS POST PIPELINE
+====================
 Preprocessing pipeline: caption images, generate embeddings, store posts.
 
 Run:
@@ -9,18 +12,14 @@ Steps:
   2. Caption any image-only posts that lack a caption (BLIP vision model)
   3. Batch-embed all posts (combines post_text + image_caption when both exist)
   4. Save to Elasticsearch (if running) and to output/processed_posts.json
-  5. Write updated embeddings/captions back to sample_posts.json
-
-  TODO: Convert to class-based pipeline with separate distinct steps that can be run independently
 """
 
 import json
 import logging
-from typing import Any
 
 from elasticsearch import Elasticsearch
-from pydantic import BaseModel, ConfigDict
 from sentence_transformers import SentenceTransformer
+from transformers import BlipForConditionalGeneration, BlipProcessor
 
 from src.config import (
     ELASTICSEARCH_URL,
@@ -29,178 +28,154 @@ from src.config import (
     REPO,
     VISION_MODEL_NAME,
 )
-from src.models import PostDocument
+from src.data_models import PostDocument
 
 logger = logging.getLogger(__name__)
 
 
-# ── Text helper
-
-
-def embedding_text(post: dict) -> str:
+def extract_embedding_text(postdoc: PostDocument) -> str:
     """
     Build the text string passed to the embedding model.
-    Combines post_text (preprocessed) with image_caption so that image-only
-    posts are searchable via their visual content
+
+    Combines the elements of a PostDocument that should be included in the
+    embedding into a single string. Elements that should not be included
+    (e.g. post_id, image_url) are ignored.
     """
-    doc = PostDocument(**post)
-    text = doc.preprocess_text().strip()
-    caption = (post.get("image_caption") or "").strip()
+    # Extract the text elements to embed
+    text = postdoc.preprocess_text().strip()
+    # Check if the post has an image caption (i.e. image converted to text)
+    caption = (postdoc.image_caption or "").strip()
     if text and caption:
         return f"{text} {caption}"
     return text or caption
 
 
-# ── Image captioning ─────────────────────────────────────────────────
+class PreprocessingPipeline:
+    """End-to-end preprocessing pipeline: load → caption → embed → store."""
 
+    def __init__(self) -> None:
+        """Load models and attempt to connect to Elasticsearch."""
+        self.elasticsearch_client = self._connect_elasticsearch()
+        logger.info(f"Loading embedding model {EMBEDDING_MODEL_NAME}…")
+        self.embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
+        logger.info("Embedding model loaded.")
+        logger.info(f"Loading vision model {VISION_MODEL_NAME}…")
+        self._vision_processor, self._vision_model = self._load_vision_model()
+        logger.info("Vision model loaded.")
 
-def _load_blip() -> tuple[Any, Any, str]:
-    """Load BLIP processor and model. Returns (processor, model, device)."""
-    import torch
-    from transformers import BlipForConditionalGeneration, BlipProcessor
+    def _load_vision_model(self) -> tuple:
+        """Load vision model processor and model for image captioning."""
+        processor = BlipProcessor.from_pretrained(
+            VISION_MODEL_NAME,
+            use_fast=False,  # fast image processor incompatible so we disable it.
+            use_fast_tokenizer=True,
+        )
+        model = BlipForConditionalGeneration.from_pretrained(
+            VISION_MODEL_NAME,
+            use_safetensors=True,
+            # force_download=True, # uncomment to clear model cache
+        )
+        return processor, model.to("cpu")
 
-    logger.info(f"Loading vision model {VISION_MODEL_NAME}…")
-    processor = BlipProcessor.from_pretrained(VISION_MODEL_NAME)
-    model = BlipForConditionalGeneration.from_pretrained(VISION_MODEL_NAME)
+    def _connect_elasticsearch(self) -> Elasticsearch | None:
+        """
+        Return a connected Elasticsearch client, or None if Elasticsearch is
+        unavailable.
+        """
+        try:
+            client = Elasticsearch(ELASTICSEARCH_URL)
+            client.info()
+            return client
+        except Exception:
+            return None
 
-    if torch.backends.mps.is_available():
-        device = "mps"
-    elif torch.cuda.is_available():
-        device = "cuda"
-    else:
-        device = "cpu"
+    def load_postdocs(self) -> list[PostDocument]:
+        """Load raw posts from sample_posts.json and parse into PostDocument objects."""
+        logger.info("Loading sample_posts.json…")
+        with open(REPO / "sample_posts.json") as f:
+            return [PostDocument(**p) for p in json.load(f)]
 
-    model = model.to(device)
-    logger.info(f"Vision model loaded on {device}.")
-    return processor, model, device
+    def _caption_single_post(self, postdoc: PostDocument) -> None:
+        """
+        Run vision model on one postdoc and set image_caption in-place.
+        For most projects the HuggingFace pipeline API is simpler:
+            from transformers import pipeline
+            captioner = pipeline("image-to-text",
+                                 model="Salesforce/blip-image-captioning-base",
+                                 model_kwargs={"use_safetensors": True})
+            caption = captioner(image, max_new_tokens=125)[0]["generated_text"]
+        To illustrate the underlying steps, and to ensure cross-device
+        compatibility, we use the processor and model directly here.
+        """
+        if not postdoc.image_url:
+            return
 
+        logger.info(f"Captioning image for post {postdoc.post_id}…")
 
-def _caption_single_post(post: dict, processor, model, device) -> None:
-    """Run BLIP inference on one post and set image_caption in-place."""
-    from PIL import Image
+        ### EXERCISE ###
+        # Load the image from the URL (hint: use PIL.Image)
+        # Use a vision model to generate a caption for the image (hint: use the processor and model)
+        # Store the caption on the postdoc (postdoc.image_caption = caption)
 
-    img_path = REPO / post["image_url"]
-    if not img_path.exists():
-        logger.warning(f"Image file not found: {img_path}")
-        return
-    logger.info(f"Captioning {img_path.name}…")
-    image = Image.open(img_path).convert("RGB")
-    inputs = processor(image, return_tensors="pt").to(device)
-    out = model.generate(**inputs, max_new_tokens=50)
-    caption = processor.decode(out[0], skip_special_tokens=True)
-    post["image_caption"] = caption
-    logger.info(f"  → {caption}")
+    def caption_images(self, postdocs: list[PostDocument]) -> list[PostDocument]:
+        """Caption image-only posts"""
+        needs_caption = [postdoc for postdoc in postdocs if postdoc.image_url]
+        if not needs_caption:
+            logger.info("No image posts need captioning.")
+            return postdocs
+        for postdoc in needs_caption:
+            self._caption_single_post(postdoc)
+        return postdocs
 
+    def generate_embeddings(self, postdocs: list[PostDocument]) -> list[PostDocument]:
+        """
+        Embed all postdocs using the embedding model.
+        """
+        logger.info(f"Embedding {len(postdocs)} postdocs…")
+        ### EXERCISE ###
+        # For each postdoc, extract the text to embed (hint: use the
+        # extract_embedding_text function above)
+        # Use the embedding model to generate an embedding vector for the text
+        # Store the embedding vector on the postdoc (postdoc.doc_embedding = embedding)
+        return postdocs
 
-def caption_images(posts: list[dict]) -> list[dict]:
-    """Caption image-only posts that have no caption yet."""
-    needs_caption = [p for p in posts if p.get("image_url") and not p.get("image_caption")]
-    if not needs_caption:
-        logger.info("No image posts need captioning.")
-        return posts
+    def save_to_elasticsearch(self, postdocs: list[PostDocument]) -> None:
+        """Index all postdocs into Elasticsearch."""
+        from src.es_index import INDEX_NAME, create_index
 
-    processor, model, device = _load_blip()
-    for p in needs_caption:
-        _caption_single_post(p, processor, model, device)
-    return posts
+        client = self.elasticsearch_client
+        if client is None:
+            return
 
+        create_index(client)
+        for postdoc in postdocs:
+            client.index(index=INDEX_NAME, id=postdoc.post_id, body=postdoc.model_dump(mode="json"))
+        logger.info(f"Stored {len(postdocs)} postdocs in Elasticsearch.")
 
-# ── Embedding ──────────────────────────────────────────────────────────────
+    def save_processed_posts(self, postdocs: list[PostDocument]) -> None:
+        """Write output/processed_posts.json keyed by post_id for downstream steps."""
+        OUTPUT.mkdir(exist_ok=True)
+        doc_index = {postdoc.post_id: postdoc.model_dump(mode="json") for postdoc in postdocs}
+        with open(OUTPUT / "processed_posts.json", "w") as f:
+            json.dump(doc_index, f)
+        logger.info(f"Saved processed_posts.json ({len(doc_index)} postdocs).")
 
+    def run(self) -> None:
+        """Run the full preprocessing pipeline: load → caption → embed → store."""
+        postdocs = self.load_postdocs()
+        postdocs = self.caption_images(postdocs)
+        postdocs = self.generate_embeddings(postdocs)
 
-def generate_embeddings(posts: list[dict], model: SentenceTransformer) -> list[dict]:
-    """
-    Embed all posts that need it.
-    Re-embeds image posts that now have a caption but were previously embedded
-    without one (their old embedding was based on empty text).
-    """
-    for p in posts:
-        has_image_caption = p.get("image_url") and p.get("image_caption") and p.get("doc_embedding")
-        if has_image_caption and not p.get("post_text", "").strip():
-            p["doc_embedding"] = []  # force re-embed with caption text
+        if self.elasticsearch_client:
+            logger.info("Elasticsearch available — saving postdocs.")
+            self.save_to_elasticsearch(postdocs)
+        else:
+            logger.info("Elasticsearch not available — using disk only.")
 
-    needs = [p for p in posts if not p.get("doc_embedding")]
-    logger.info(f"Embedding {len(needs)} posts ({len(posts) - len(needs)} already done)…")
-
-    if not needs:
-        return posts
-
-    texts = [embedding_text(p) for p in needs]
-    embeddings = model.encode(texts, batch_size=32, show_progress_bar=True, convert_to_numpy=True)
-    for p, emb in zip(needs, embeddings, strict=True):
-        p["doc_embedding"] = emb.tolist()
-
-    return posts
-
-
-# ── Storage ────────────────────────────────────────────────────────────────
-
-
-def _try_elasticsearch_client() -> Elasticsearch | None:
-    """Return a connected Elasticsearch client, or None if unavailable."""
-    try:
-        client = Elasticsearch(ELASTICSEARCH_URL)
-        client.info()
-        return client
-    except Exception:
-        return None
-
-
-class ElasticsearchSaveArgs(BaseModel):
-    """Input arguments for save_to_elasticsearch."""
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    posts: list[dict]
-    client: Elasticsearch
-    index_name: str = "post_docs"
-
-
-def save_to_elasticsearch(args: ElasticsearchSaveArgs) -> None:
-    from src.es_index import INDEX_NAME, create_index
-
-    create_index(args.client)
-    for p in args.posts:
-        doc = PostDocument(**p)
-        args.client.index(index=INDEX_NAME, id=doc.post_id, body=doc.model_dump(mode="json"))
-    logger.info(f"Stored {len(args.posts)} posts in Elasticsearch index '{args.index_name}'.")
-
-
-def save_processed_posts(posts: list[dict]) -> None:
-    """Write output/processed_posts.json keyed by post_id for downstream pipeline steps."""
-    OUTPUT.mkdir(exist_ok=True)
-    doc_index = {p["post_id"]: p for p in posts}
-    with open(OUTPUT / "processed_posts.json", "w") as f:
-        json.dump(doc_index, f, default=str)
-    logger.info(f"Saved processed_posts.json ({len(doc_index)} posts).")
-
-
-# ── Entry point ────────────────────────────────────────────────────────────
-
-
-def run() -> None:
-    """Caption images, embed all posts, save to Elasticsearch and disk."""
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
-
-    logger.info("Loading sample_posts.json…")
-    with open(REPO / "sample_posts.json") as f:
-        posts = json.load(f)
-
-    posts = caption_images(posts)
-
-    model = SentenceTransformer(EMBEDDING_MODEL_NAME)
-    posts = generate_embeddings(posts, model)
-
-    client = _try_elasticsearch_client()
-    if client:
-        logger.info("Elasticsearch available — saving posts.")
-        save_to_elasticsearch(ElasticsearchSaveArgs(posts=posts, client=client))
-    else:
-        logger.info("Elasticsearch not available — using disk only.")
-
-    save_processed_posts(posts)
-    logger.info("Preprocessing complete. Run: uv run python -m src.topic_model")
+        self.save_processed_posts(postdocs)
+        logger.info("Preprocessing complete. Run: uv run python -m src.topic_model")
 
 
 if __name__ == "__main__":
-    run()
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
+    PreprocessingPipeline().run()

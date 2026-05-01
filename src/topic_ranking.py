@@ -1,4 +1,9 @@
-"""Score and rank topics by engagement (likes) and recency."""
+"""
+====================
+TOPIC RANKING
+====================
+Score and rank topics by engagement (likes) and recency.
+"""
 
 from datetime import UTC, datetime
 
@@ -51,15 +56,17 @@ def rank_topics(args: TopicRankingArgs) -> list[TrendingTopic]:
             continue
 
         # Sum likes to measure engagement
-        total_likes = sum(args.posts_by_id.get(pid, {}).get("likes", 0) for pid in post_ids)
-        ts_list = [
-            _parse_ts(args.posts_by_id[pid]["created_at"])
-            for pid in post_ids
-            if pid in args.posts_by_id
+        total_likes = sum(args.posts_by_id.get(post_id, {}).get("likes", 0) for post_id in post_ids)
+        timestamps = [
+            _parse_ts(args.posts_by_id[post_id]["created_at"])
+            for post_id in post_ids
+            if post_id in args.posts_by_id
         ]
 
         # Calculate recency
-        avg_days_ago = (most_recent_ts - sum(ts_list) / len(ts_list)) / 86400 if ts_list else 999
+        avg_days_ago = (
+            (most_recent_ts - sum(timestamps) / len(timestamps)) / 86400 if timestamps else 999
+        )
         recency = max(0.0, 100.0 - (avg_days_ago / 365) * 100)
 
         # Calculate a simple trending score with 65% weight on likes and 35% on recency
@@ -77,5 +84,5 @@ def rank_topics(args: TopicRankingArgs) -> list[TrendingTopic]:
             )
         )
 
-    rows.sort(key=lambda r: r.trending_score, reverse=True)
+    rows.sort(key=lambda topic: topic.trending_score, reverse=True)
     return rows[: args.top_n]

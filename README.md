@@ -14,7 +14,15 @@ human-interpretable labels is challenging. Framing topic modeling as a search pr
 overcome these challenges and makes it easier to use supervised or unsupervised topic models
 in real-time applications.
 
-- [PyBay 2024 - Thinking of Topic Modeling as Search (video)](https://www.youtube.com/watch?v=vymhlfxAd4Y)
+- [PyBay 2024 - Thinking of Topic Modeling as Search
+  (video)](https://www.youtube.com/watch?v=vymhlfxAd4Y)
+
+---
+## Requirements
+
+- Python 3.12+
+- [uv](https://docs.astral.sh/uv/) package manager
+- Docker + Docker Compose
 
 ---
 
@@ -55,11 +63,17 @@ uv run streamlit run app.py
 
 ### 5. Shutdown the demo app and docker containers 
 ```bash
-pkill -f "streamlit run app.py
+pkill -f "streamlit run app.py 
 docker compose down 
 -- make any changes necessary -- 
 uv sync 
 uv run streamlit run app.py (the app preloads sample posts on startup)
+```
+
+If model versions are an issue, you may need to remove cached pre-trained models: 
+
+```
+rm -rf ~/.cache/huggingface/hub/models--Salesforce--blip-image-captioning-base
 ```
 ---
 
@@ -97,13 +111,7 @@ OLLAMA_MODEL=llama3.2:3b uv run python src/topic_model.py
 
 ## Explanatory notebooks and Code Exercises
 
-| # | File | Topic | Exercise | 
-|---|------|-------|
-| 0 | `notebooks/00_setup_check.ipynb` | Pre-workshop environment check — run before arrival | Run a basic keyword search | 
-| 1 | `notebooks/01_embeddings.ipynb` | L1: embeddings  | Creating document embeddings
-| 2 | `notebooks/02_topic_model.ipynb` | L2: topic modeling | Build a topic model |
-| 3 | `notebooks/03_search_evaluation.ipynb` | L3: evaluation| Search precision (Document mean vs. localized embeddings) |
-| 4 | `notebooks/04_enhanced_preprocessing.ipynb` | L4: enhancements | Add a vision model to pre-processing to caption images.
+
 
 As the demo progresses you will update specific functions ("Exercises") in the
 `/src` code based on concepts explained in the notebooks created for the workshop.
@@ -142,15 +150,6 @@ in the terminal after running `uv run python -m src.topic_model`. It is a
 `multiprocess` It can be ignored.
 
 ---
-
-## Requirements
-
-- Python 3.12+
-- [uv](https://docs.astral.sh/uv/) package manager
-- Docker + Docker Compose
-
----
-
 
 
 # References and Credits

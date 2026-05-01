@@ -22,9 +22,10 @@ dependencies = [
     "httpx>=0.27",
     "datasets>=2.0",
     "Pillow>=10.0",
+    "ruff>=0.15.12",
     "torch>=2.0,<2.3",
     "torchvision>=0.17,<0.18",
-    "ruff>=0.15.12",
+    "safetensors>=0.4",
 ]
 
 [dependency-groups]
@@ -61,10 +62,14 @@ environments = [
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+markers = [
+    "exercise: tests for workshop exercise placeholders",
+]
 
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+extend-exclude = ["*.ipynb", "notebooks/"]
 
 [tool.ruff.lint]
 select = [

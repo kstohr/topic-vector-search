@@ -16,8 +16,16 @@ from src.search import (
 )
 
 SAMPLE_POSTS = [
-    {"post_id": "1", "post_text": "Python is great for data science", "doc_embedding": [1.0, 0.0, 0.0]},
-    {"post_id": "2", "post_text": "I love machine learning with Python", "doc_embedding": [0.0, 1.0, 0.0]},
+    {
+        "post_id": "1",
+        "post_text": "Python is great for data science",
+        "doc_embedding": [1.0, 0.0, 0.0],
+    },
+    {
+        "post_id": "2",
+        "post_text": "I love machine learning with Python",
+        "doc_embedding": [0.0, 1.0, 0.0],
+    },
     {"post_id": "3", "post_text": "Rust is blazing fast", "doc_embedding": [0.0, 0.0, 1.0]},
 ]
 
@@ -31,7 +39,9 @@ def keyword_searcher():
 def semantic_searcher():
     with patch("src.search.SentenceTransformer") as mock_st:
         mock_model = MagicMock()
-        mock_model.encode.return_value = np.array([1.0, 0.0, 0.0]) # sample test embedding with dim 3
+        mock_model.encode.return_value = np.array(
+            [1.0, 0.0, 0.0]
+        )  # sample test embedding with dim 3
         mock_st.return_value = mock_model
         yield InMemorySemanticSearcher(SAMPLE_POSTS)
 
@@ -147,6 +157,7 @@ class TestGetSearcherLabel:
     def test_unknown_searcher_returns_class_name(self):
         class CustomSearcher:
             pass
+
         label = get_searcher_label(CustomSearcher())
         assert label == "CustomSearcher"
 
@@ -164,7 +175,9 @@ class TestRunKeywordSearch:
 class TestRunSemanticSearch:
     def test_returns_results(self, semantic_searcher):
         embedding = np.array([1.0, 0.0, 0.0])
-        results = run_search_by_topic(TopicSearchArgs(embedding=embedding, searcher=semantic_searcher))
+        results = run_search_by_topic(
+            TopicSearchArgs(embedding=embedding, searcher=semantic_searcher)
+        )
         assert len(results) > 0
 
     def test_raises_when_searcher_lacks_embedding_model(self, keyword_searcher):

@@ -27,7 +27,6 @@ from src.evaluation import (
     DEFAULT_EVAL_K,
     DEFAULT_PRECISION_K,
     DEFAULT_RECALL_K,
-    SearchResultRow,
     SearchResultRowsArgs,
     TopicEvalArgs,
     build_search_result_rows,
@@ -248,12 +247,14 @@ def load_topic_embeddings() -> dict[int, list[float]]:
 
 @st.cache_data
 def get_trending() -> list[TrendingTopic]:
-    return rank_topics(TopicRankingArgs(
-        assignments=load_assignments(),
-        posts_by_id=load_posts_by_id(),
-        labels=load_topic_labels(),
-        keywords=load_topic_keywords(),
-    ))
+    return rank_topics(
+        TopicRankingArgs(
+            assignments=load_assignments(),
+            posts_by_id=load_posts_by_id(),
+            labels=load_topic_labels(),
+            keywords=load_topic_keywords(),
+        )
+    )
 
 
 # ── Search helpers ──────────────────────────────────────────────────────────
@@ -261,7 +262,9 @@ def get_trending() -> list[TrendingTopic]:
 
 def _search_by_text(query: str, top_k: int) -> list[dict]:
     """Text search from the search bar. Works with all four searchers in get_searcher()."""
-    return run_search_by_text(TextSearchArgs(query=query, searcher=build_searcher(text_engine), top_k=top_k))
+    return run_search_by_text(
+        TextSearchArgs(query=query, searcher=build_searcher(text_engine), top_k=top_k)
+    )
 
 
 def _topic_embeddings() -> dict[int, list[float]]:
@@ -282,7 +285,9 @@ def _embedding_strategy_label() -> str:
 def _search_by_topic(topic_id: int, top_k: int) -> list[dict]:
     """Topic embedding search. Always uses get_topic_searcher() — a semantic searcher."""
     emb = np.array(_topic_embeddings()[topic_id], dtype=np.float32)
-    return run_search_by_topic(TopicSearchArgs(embedding=emb, searcher=build_topic_searcher(topic_engine), top_k=top_k))
+    return run_search_by_topic(
+        TopicSearchArgs(embedding=emb, searcher=build_topic_searcher(topic_engine), top_k=top_k)
+    )
 
 
 # ── Image helper ────────────────────────────────────────────────────────────
@@ -404,12 +409,14 @@ def render_feed(results: list[dict]) -> None:
 
 
 def render_results_eval(results: list[dict]) -> None:
-    rows = build_search_result_rows(SearchResultRowsArgs(
-        results=results,
-        posts_by_id=load_posts_by_id(),
-        assignments=load_assignments(),
-        labels=load_topic_labels(),
-    ))
+    rows = build_search_result_rows(
+        SearchResultRowsArgs(
+            results=results,
+            posts_by_id=load_posts_by_id(),
+            assignments=load_assignments(),
+            labels=load_topic_labels(),
+        )
+    )
     dicts = []
     for row in rows:
         d = row.model_dump()
