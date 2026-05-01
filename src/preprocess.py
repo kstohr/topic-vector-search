@@ -117,7 +117,8 @@ class PreprocessingPipeline:
         """Load vision model processor and model for image captioning."""
         processor = BlipProcessor.from_pretrained(
             VISION_MODEL_NAME,
-            use_fast_tokenizer=True,  # avoid warning; speed processing
+            use_fast=False,  # fast image processor incompatible so we disable it.
+            use_fast_tokenizer=True,
         )
         model = BlipForConditionalGeneration.from_pretrained(
             VISION_MODEL_NAME,
@@ -156,6 +157,9 @@ class PreprocessingPipeline:
         To illustrate the underlying steps, and to ensure cross-device
         compatibility, we use the processor and model directly here.
         """
+        if not post.image_url:
+            return
+
         # Load the image from disk and convert to RGB (BLIP expects 3-channel input)
         img_path = REPO / post.image_url
         if not img_path.exists():
@@ -252,11 +256,13 @@ class PreprocessingPipeline:
         """Index all posts into Elasticsearch."""
         from src.es_index import INDEX_NAME, create_index
 
-        create_index(self.elasticsearch_client)
+        client = self.elasticsearch_client
+        if client is None:
+            return
+
+        create_index(client)
         for post in posts:
-            self.elasticsearch_client.index(
-                index=INDEX_NAME, id=post.post_id, body=post.model_dump(mode="json")
-            )
+            client.index(index=INDEX_NAME, id=post.post_id, body=post.model_dump(mode="json"))
         logger.info(f"Stored {len(posts)} posts in Elasticsearch.")
 
     def save_processed_posts(self, posts: list[PostDocument]) -> None:
