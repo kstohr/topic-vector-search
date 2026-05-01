@@ -1,4 +1,10 @@
-"""Pydantic models for raw posts (Post) and processed post documents (PostDocument)."""
+"""
+====================
+DATA MODELS
+====================
+Pydantic models for raw posts (Post) and processed post documents
+(PostDocument).
+"""
 
 import re
 from datetime import UTC, datetime
@@ -8,7 +14,11 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class Post(BaseModel):
-    """Raw unprocessed social media post as generated or ingested."""
+    """
+    Raw unprocessed social media post as generated or ingested. This is what
+    might be stored in a database for a post. The fields here are based on
+    typical social media post attributes.
+    """
 
     post_id: str
     post_author: str
@@ -17,7 +27,7 @@ class Post(BaseModel):
     post_text: str
     likes: int = 0
     image_url: str | None = None
-    generated_topic: str | None = None
+    generated_topic: str | None = None  # Reference only
 
     @field_validator("created_at", "modified_at", mode="before")
     @classmethod
