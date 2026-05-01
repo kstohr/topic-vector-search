@@ -221,3 +221,16 @@ def test_build_search_result_rows_uses_placeholder_for_image_without_caption() -
     assert rows[0].post == "[image — no caption yet]"
     assert rows[0].topic == ""
     assert rows[0].image_url == ""
+
+
+def test_build_search_result_rows_coerces_none_image_url_to_empty_string() -> None:
+    rows = build_search_result_rows(
+        SearchResultRowsArgs(
+            results=[{"post_id": "p3", "post_text": "hello", "score": 0.2}],
+            posts_by_id={"p3": {"image_caption": "", "image_url": None}},
+            assignments=pd.DataFrame({"post_id": ["p3"], "topic_id": [1]}),
+            labels={1: {"label": "Topic One"}},
+        )
+    )
+
+    assert rows[0].image_url == ""
