@@ -1,4 +1,9 @@
-"""Score and rank topics by engagement (likes) and recency."""
+"""
+====================
+TOPIC RANKING
+====================
+Score and rank topics by engagement (likes) and recency.
+"""
 
 from datetime import UTC, datetime
 

@@ -1,4 +1,10 @@
-"""Workshop pre-loading: index raw posts into Elasticsearch for keyword search."""
+"""
+====================
+PRELOAD RAW SAMPLE POSTS INTO ELASTICSEARCH
+====================
+Workshop pre-loading: index raw posts into Elasticsearch for keyword search.
+
+"""
 
 import json
 import logging
@@ -7,8 +13,8 @@ from pathlib import Path
 from elasticsearch import Elasticsearch, helpers
 
 from src.config import ELASTICSEARCH_URL, REPO
+from src.data_models import PostDocument
 from src.es_index import INDEX_NAME, create_index
-from src.models import PostDocument
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
 logger = logging.getLogger(__name__)

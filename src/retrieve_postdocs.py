@@ -1,11 +1,18 @@
+"""
+====================
+RETREIVE POST DOCUMENTS
+====================
+Helper functions to retrieve post documents from Elasticsearch or disk.
+"""
+
 import json
 import logging
 from pathlib import Path
 
 from elasticsearch import Elasticsearch
 
+from src.data_models import PostDocument
 from src.es_index import INDEX_NAME
-from src.models import PostDocument
 
 logger = logging.getLogger(__name__)
 

@@ -1,4 +1,11 @@
-"""Search backends: keyword (BM25/in-memory) and semantic (Elasticsearch/in-memory)."""
+"""
+====================
+SEARCH
+====================
+
+Search backends: keyword (BM25/in-memory) and semantic
+(Elasticsearch/in-memory).
+"""
 
 import logging
 from typing import Any
@@ -9,7 +16,7 @@ from pydantic import BaseModel, ConfigDict
 from sentence_transformers import SentenceTransformer
 
 from src.config import ELASTICSEARCH_URL, EMBEDDING_MODEL_NAME
-from src.models import PostDocument
+from src.data_models import PostDocument
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

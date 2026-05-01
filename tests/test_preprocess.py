@@ -3,9 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
+import pytest
 from PIL import Image
 
-from src.models import PostDocument
+from src.data_models import PostDocument
 from src.preprocess import PreprocessingPipeline, extract_embedding_text
 
 BASE_POST = {

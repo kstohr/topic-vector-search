@@ -1,4 +1,8 @@
 """
+====================
+TOPIC MODEL TRAINING
+====================
+
 Topic model training pipeline.
 
 Run:
@@ -18,9 +22,6 @@ LLM labeling priority:
   1. Ollama at localhost:11434  (no API key needed)
   2. OPENAI_API_KEY env var     (OpenAI API)
   3. KeyBERT keywords only      (no LLM)
-
-
-
 """
 
 import json
@@ -46,7 +47,7 @@ from src.config import (
 from src.config import (
     EMBEDDING_MODEL_NAME as EMBEDDING_MODEL,
 )
-from src.models import PostDocument
+from src.data_models import PostDocument
 from src.preprocess import extract_embedding_text
 from src.retrieve_postdocs import retrieve_postdocs_from_disk, retrieve_postdocs_from_elasticsearch
 
@@ -105,7 +106,10 @@ class TopicModeler:
     # ── Model training ─────────────────────────────────────────────────────
 
     def train_topic_model(self) -> tuple[list[int], np.ndarray]:
-        """Build and fit the BERTopic model; return topic assignments and probabilities."""
+        """
+        Build and fit the BERTopic model; return topic assignments
+        and probabilities.
+        """
         logger.info("Training BERTopic model.")
 
         if not self.doc_index:

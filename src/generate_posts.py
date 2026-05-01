@@ -1,5 +1,12 @@
 """
-Generate posts on six (7) example topics.
+====================
+GENERATE POSTS
+====================
+
+Generate synthetic posts on seven (7) example topics. This calls an LLM (in this
+case, Ollama) to generate engaging social media posts that include relevant
+emojis and keywords. The generated posts are saved to sample_posts.json and
+serve as the dataset for the topic modeling and search pipeline.
 """
 
 import json
@@ -12,7 +19,7 @@ from pathlib import Path
 from openai import OpenAI
 
 from src.config import OLLAMA_MODEL, OLLAMA_URL, REPO
-from src.models import Post
+from src.data_models import Post
 
 ASSETS_DIR = REPO / "assets"
 

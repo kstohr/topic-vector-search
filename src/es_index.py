@@ -1,4 +1,10 @@
-"""Elasticsearch index definition and lifecycle helpers for post_docs."""
+"""
+====================
+ELASTICSEARCH INDEX DEFINITION AND TOOLS
+====================
+Elasticsearch index definition for post_docs. Includes database helpers for
+creating, deleting, and managing the index.
+"""
 
 import logging
 

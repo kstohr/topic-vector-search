@@ -1,10 +1,15 @@
 """
-End-to-end pipeline: preprocessing → topic modeling.
+====================
+RUN END-TO-END PIPELINE
+====================
+End-to-end pipeline: clear Elasticsearch index → preprocessing → topic modeling.
+
+Once you have run this, don't forget to clear the cache in the demo app to see the new results.
 """
 
+from src.es_index import delete_index, get_es_client
 from src.preprocess import PreprocessingPipeline
 from src.topic_model import TopicModeler
-from src.es_index import delete_index, get_es_client
 
 
 def pipeline():

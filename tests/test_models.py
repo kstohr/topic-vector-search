@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.models import PostDocument
+from src.data_models import PostDocument
 
 BASE = {
     "post_id": "abc",

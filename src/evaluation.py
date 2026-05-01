@@ -1,5 +1,9 @@
 """
+====================
 TOPIC SEARCH EVALUATION METRICS
+====================
+
+Below are the key metrics we compute to evaluate the quality of our topic search results:
 
 - Evaluation-k (e.g., k=100; *retrieval depth*)
 How many results to retrieve for evaluation. This is passed to the "size"
@@ -28,6 +32,7 @@ understand how much better our search is compared to random chance. We compute
 this for each topic and include it in the evaluation metrics for context.
 """
 
+import logging
 from typing import Any
 
 import numpy as np
@@ -39,6 +44,9 @@ from src.search import TopicSearchArgs, run_search_by_topic
 DEFAULT_EVAL_K = 100  # Retrieval depth
 DEFAULT_RECALL_K = 100  # Evaluation cutoff
 DEFAULT_PRECISION_K = 8  # Display cutoff
+
+
+logger = logging.getLogger(__name__)
 
 
 class ComputePrecisionResp(BaseModel):
@@ -56,6 +64,7 @@ def compute_precision_at_k(
     """Computes Precision@K: the proportion of the top-K retrieved posts that
     are relevant to the topic.
     """
+    logger.info(f"Computing Precision@{k}")
     # Retrieval may return < K results. This may be less than K
     top_k_ids = retrieved_ids[:k]
     if not top_k_ids:
@@ -83,6 +92,7 @@ def compute_recall_at_k(
     Computes Recall@K: the proportion of relevant posts that are retrieved in
     the top-K results.
     """
+    logger.info(f"Computing Recall@{k}")
     top_k_ids = retrieved_ids[:k]
     if not topic_post_ids:
         return ComputeRecallResp(recall=0.0, hits=0)
@@ -100,6 +110,7 @@ def compute_random_baseline(
     """
     Computes the expected precision of a random baseline for a given topic.
     """
+    logger.info("Computing Baseline Precision")
     if dataset_size == 0:
         return 0.0  # Avoid division by zero.
     return topic_size / dataset_size

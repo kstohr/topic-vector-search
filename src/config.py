@@ -1,4 +1,9 @@
-"""Centralised configuration: paths, model names, and service URLs."""
+"""
+====================
+PROJECT CONFIGURATION
+====================
+Centralized configuration: paths, model names, and service URLs.
+"""
 
 import os
 from pathlib import Path

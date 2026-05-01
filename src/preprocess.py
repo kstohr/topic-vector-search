@@ -1,4 +1,7 @@
 """
+====================
+PREPROCESS POST PIPELINE
+====================
 Preprocessing pipeline: caption images, generate embeddings, store posts.
 
 Run:
@@ -78,7 +81,7 @@ from src.config import (
     REPO,
     VISION_MODEL_NAME,
 )
-from src.models import PostDocument
+from src.data_models import PostDocument
 
 logger = logging.getLogger(__name__)
 
