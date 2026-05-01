@@ -112,6 +112,15 @@ class TopicModeler:
         """
         logger.info("Training BERTopic model.")
 
+        ### EXERCISE ###
+        # Review the parameters passed to the BERTopic constructor below. Try
+        # changing some of them and see how it affects the resulting topics.
+        # Can you force the model to find more or fewer topics? More specific or
+        # more general topics?
+        # Can you change how the AI labels are generated to use either more
+        # common or less common words?
+        # Can you force the model to fail?
+
         if not self.doc_index:
             raise RuntimeError("No post documents available for training.")
 

@@ -37,8 +37,8 @@ def retrieve_postdocs_from_elasticsearch(es_client: Elasticsearch) -> dict[str, 
     hits = response["hits"]["hits"]
     while hits:
         for hit in hits:
-            post = PostDocument(**hit["_source"])
-            doc_index[post.post_id] = post
+            postdoc = PostDocument(**hit["_source"])
+            doc_index[postdoc.post_id] = postdoc
         response = es_client.scroll(scroll_id=scroll_id, scroll="2m")
         scroll_id = response["_scroll_id"]
         hits = response["hits"]["hits"]

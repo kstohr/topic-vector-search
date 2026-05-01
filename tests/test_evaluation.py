@@ -20,6 +20,7 @@ from src.evaluation import (
 )
 
 
+@pytest.mark.exercise
 def test_compute_random_baseline_returns_topic_fraction() -> None:
     assert compute_random_baseline(topic_size=25, dataset_size=100) == 0.25
 
@@ -28,6 +29,7 @@ def test_compute_random_baseline_returns_zero_when_dataset_empty() -> None:
     assert compute_random_baseline(topic_size=5, dataset_size=0) == 0.0
 
 
+@pytest.mark.exercise
 def test_compute_precision_at_k_counts_hits_in_top_k() -> None:
     result = compute_precision_at_k(
         retrieved_ids=["p1", "p2", "p3", "p4"],
@@ -39,6 +41,7 @@ def test_compute_precision_at_k_counts_hits_in_top_k() -> None:
     assert result.precision == pytest.approx(1 / 3)
 
 
+@pytest.mark.exercise
 def test_compute_precision_at_k_uses_all_retrieved_if_less_than_k() -> None:
     result = compute_precision_at_k(
         retrieved_ids=["p1", "p2"],
@@ -60,6 +63,7 @@ def test_compute_precision_at_k_returns_zero_for_empty_retrieval() -> None:
     assert result == ComputePrecisionResp(precision=0.0, hits=0)
 
 
+@pytest.mark.exercise
 def test_compute_recall_at_k_counts_hits_against_all_relevant_posts() -> None:
     result = compute_recall_at_k(
         retrieved_ids=["a", "b", "c", "d"],
@@ -81,6 +85,7 @@ def test_compute_recall_at_k_returns_zero_for_empty_topic_posts() -> None:
     assert result == ComputeRecallResp(recall=0.0, hits=0)
 
 
+@pytest.mark.exercise
 def test_compute_recall_at_k_uses_top_k_only() -> None:
     result = compute_recall_at_k(
         retrieved_ids=["hit1", "miss", "hit2", "hit3"],
@@ -92,6 +97,7 @@ def test_compute_recall_at_k_uses_top_k_only() -> None:
     assert result.recall == pytest.approx(1 / 3)
 
 
+@pytest.mark.exercise
 def test_compute_topic_search_eval_metrics_counts_precision_recall_and_baseline() -> None:
     args = TopicSearchMetricArgs(
         dataset_size=10,
@@ -112,6 +118,7 @@ def test_compute_topic_search_eval_metrics_counts_precision_recall_and_baseline(
     assert result.num_retrieved_by_search == 5
 
 
+@pytest.mark.exercise
 def test_evaluate_topics_returns_one_row_per_topic(monkeypatch: pytest.MonkeyPatch) -> None:
     search_results_by_embedding = {
         (1.0, 0.0): [

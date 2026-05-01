@@ -124,11 +124,11 @@ def test_whitespace_only_text_treated_as_empty() -> None:
 
 def test_caption_single_post_returns_early_when_no_image_url() -> None:
     pipeline, processor, model = _make_pipeline_with_fakes()
-    post = make_with_image(image_url=None)
+    postdoc = make_with_image(image_url=None)
 
-    pipeline._caption_single_post(post)
+    pipeline._caption_single_post(postdoc)
 
-    assert post.image_caption is None
+    assert postdoc.image_caption is None
     assert processor.called is False
     assert model.called is False
 
@@ -137,16 +137,17 @@ def test_caption_single_post_returns_when_image_missing(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     pipeline, processor, model = _make_pipeline_with_fakes()
-    post = make_with_image(image_url="missing.jpg")
+    postdoc = make_with_image(image_url="missing.jpg")
     monkeypatch.setattr("src.preprocess.REPO", tmp_path)
 
-    pipeline._caption_single_post(post)
+    pipeline._caption_single_post(postdoc)
 
-    assert post.image_caption is None
+    assert postdoc.image_caption is None
     assert processor.called is False
     assert model.called is False
 
 
+@pytest.mark.exercise
 def test_caption_single_post_sets_caption_from_model(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -154,37 +155,39 @@ def test_caption_single_post_sets_caption_from_model(
     image_name = "cat.jpg"
     image_path = tmp_path / image_name
     Image.new("RGB", (8, 8), color=(255, 255, 255)).save(image_path)
-    post = make_with_image(image_url=image_name)
+    postdoc = make_with_image(image_url=image_name)
     monkeypatch.setattr("src.preprocess.REPO", tmp_path)
 
-    pipeline._caption_single_post(post)
+    pipeline._caption_single_post(postdoc)
 
     assert processor.called is True
     assert model.called is True
-    assert post.image_caption == "a caption from fake model"
+    assert postdoc.image_caption == "a caption from fake model"
 
 
+@pytest.mark.exercise
 def test_generate_embeddings_stores_embedding_vectors_on_posts() -> None:
     pipeline, fake_embedding_model = _make_embedding_pipeline(vectors=[[0.1, 0.2], [0.3, 0.4]])
-    posts = [
+    postdocs = [
         make(post_text="Hello world", image_caption="A cat"),
         make(post_text="", image_caption="only caption"),
     ]
 
-    result = pipeline.generate_embeddings(posts)
+    result = pipeline.generate_embeddings(postdocs)
 
-    assert result is posts
+    assert result is postdocs
     assert fake_embedding_model.called is True
     assert fake_embedding_model.last_texts == ["hello world A cat", "only caption"]
-    assert np.allclose(posts[0].doc_embedding, [0.1, 0.2])
-    assert np.allclose(posts[1].doc_embedding, [0.3, 0.4])
+    assert np.allclose(postdocs[0].doc_embedding, [0.1, 0.2])
+    assert np.allclose(postdocs[1].doc_embedding, [0.3, 0.4])
 
 
+@pytest.mark.exercise
 def test_generate_embeddings_handles_empty_posts_list() -> None:
     pipeline, fake_embedding_model = _make_embedding_pipeline(vectors=[])
-    posts: list[PostDocument] = []
+    postdocs: list[PostDocument] = []
 
-    result = pipeline.generate_embeddings(posts)
+    result = pipeline.generate_embeddings(postdocs)
 
     assert result == []
     assert fake_embedding_model.called is True

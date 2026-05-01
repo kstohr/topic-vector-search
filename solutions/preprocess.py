@@ -12,12 +12,65 @@ Steps:
   2. Caption any image-only posts that lack a caption (BLIP vision model)
   3. Batch-embed all posts (combines post_text + image_caption when both exist)
   4. Save to Elasticsearch (if running) and to output/processed_posts.json
+
+-------------------------
+Embedding explanation:
+Text → tokens
+
+"The cat sat" → [1996, 4937, 2938]
+
+Token → vector (lookup)
+
+1996 → embedding_matrix[1996] → vector of floats
+
+Those vectors are passed through layers
+Each layer applies:
+
+linear transformations (matrix multiplies)
+attention (mixing information across tokens)
+nonlinearities
+
+So each token’s vector is updated based on other tokens
+
+Final token vectors exist
+At this point, each token has a contextualized vector
+Pooling
+Those vectors are combined (e.g., mean) → one document vector
+-------------------------
+Image model tensor explanation:
+What it starts as (raw pixel)
+
+A pixel in an image is typically:
+
+R = 120, G = 200, B = 30   (values from 0–255)
+Step 1: scale to 0–1
+R = 120 / 255 ≈ 0.47
+G = 200 / 255 ≈ 0.78
+B = 30  / 255 ≈ 0.12
+Step 2: normalize (center + scale)
+
+Models expect values centered around 0:
+
+value = (value - mean) / std
+
+So you might end up with:
+
+R ≈ -0.1
+G ≈  1.2
+B ≈ -1.5
+What the float represents
+
+Each float is:
+
+"How bright this pixel is in this color channel, relative to what the model expects"
+
 """
 
 import json
 import logging
 
 from elasticsearch import Elasticsearch
+from PIL import Image
 from sentence_transformers import SentenceTransformer
 from transformers import BlipForConditionalGeneration, BlipProcessor
 
@@ -110,12 +163,37 @@ class PreprocessingPipeline:
         if not postdoc.image_url:
             return
 
-        logger.info(f"Captioning image for post {postdoc.post_id}…")
+        # Load the image from disk and convert to RGB (BLIP expects 3-channel input)
+        img_path = REPO / postdoc.image_url
+        if not img_path.exists():
+            logger.warning(f"Image file not found: {img_path}")
+            return
+        logger.info(f"Captioning {img_path.name}…")
+        image = Image.open(img_path).convert("RGB")  # BLIP expects 3-channel RGB input
 
-        ### EXERCISE ###
-        # Load the image from the URL (hint: use PIL.Image)
-        # Use a vision model to generate a caption for the image (hint: use the processor and model)
-        # Store the caption on the postdoc (postdoc.image_caption = caption)
+        # Process the image
+        # Image is resized and normalized according to model requirements.
+        # The output is a tensor (4D array, shape [1, 3, H, W])
+        # - batch size = 1 (number of images, we could do more at once)
+        # - 3 color channels (RGB)
+        # - height = 224 (# pixels in vertical dimension)
+        # - width = 224 (# pixels in horizontal dimension)
+        # This means:
+        #     1 image (leading dimension) with
+        #     3 layers (R, G, B)
+        #     each layer is a 224×224 grid of values derived from the original
+        #     pixels
+        #
+        inputs = self._vision_processor(images=image, return_tensors="pt").to("cpu")
+
+        # Pre-trained vision model (transformer-based) learns patterns in images
+        # It generates a sequence of text tokens describing the image
+        # The input is the processed image tensor
+        # The output is a sequence of token (word) IDs, which we decode back to text
+        output = self._vision_model.generate(**inputs, max_new_tokens=256)
+        caption = self._vision_processor.decode(output[0], skip_special_tokens=True)
+        postdoc.image_caption = caption
+        logger.info(f"  → {caption}")
 
     def caption_images(self, postdocs: list[PostDocument]) -> list[PostDocument]:
         """Caption image-only posts"""
@@ -132,11 +210,49 @@ class PreprocessingPipeline:
         Embed all postdocs using the embedding model.
         """
         logger.info(f"Embedding {len(postdocs)} postdocs…")
-        ### EXERCISE ###
-        # For each postdoc, extract the text to embed (hint: use the
-        # extract_embedding_text function above)
-        # Use the embedding model to generate an embedding vector for the text
-        # Store the embedding vector on the postdoc (postdoc.doc_embedding = embedding)
+        # Extract the text to embed for each postdoc.
+        # Builds the text string that is passed to the model.
+        # Combines elements of the structured document into a single string,
+        # Excludes elements that should not be included (e.g. author, post_id,
+        # image_url).
+        # Includes enriched text (i.e. emojis converted to text, image captions,
+        # any other post attributes that would be useful to search.)
+        # In this case we embed the document as a single string, but you could also embed
+        # sentences or other chunks of text depending on your use case.
+        texts = [extract_embedding_text(postdoc) for postdoc in postdocs]
+
+        # The embedding model is trained on a corpus of documents. Each word in each
+        # document is positioned in the "embedding space" based on the contexts
+        # it appears in across the corpus. Words that frequently appear in
+        # similar contexts will be positioned closer together in the embedding
+        # space.
+
+        # When we pass a new document to the model, it generates a vector (list
+        # of
+        # floats) that indicates where in the embedding space that document
+        # is positioned.
+
+        # The output is a vector (list of floats) that has length equal to the
+        # embedding dimension of the model (e.g. 384 for the all-MiniLM model).
+
+        # Similar documents will have similar vectors. So, if two posts talk
+        # about similar topics, they will have similar embeddings, and will be
+        # positioned closer together in the embedding space. This allows us to
+        # perform semantic search and topic modeling based on the content of
+        # the posts.
+
+        # Batch embed texts.
+        embeddings = self.embedding_model.encode(
+            texts,
+            batch_size=32,
+            show_progress_bar=True,
+            convert_to_numpy=True,
+        )
+        # Store the embedding vector on the PostDocument
+        for postdoc, embedding in zip(postdocs, embeddings, strict=True):
+            # Convert the Numpy array to a list so it can be JSON-serialized and stored to
+            # Elasticsearch. When we load it back for modeling, we'll convert it back to an array.
+            postdoc.doc_embedding = embedding.tolist()
         return postdocs
 
     def save_to_elasticsearch(self, postdocs: list[PostDocument]) -> None:

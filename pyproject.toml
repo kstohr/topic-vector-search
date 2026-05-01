@@ -62,6 +62,9 @@ environments = [
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+markers = [
+    "exercise: tests for workshop exercise placeholders",
+]
 
 [tool.ruff]
 line-length = 100

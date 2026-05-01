@@ -65,11 +65,14 @@ def compute_precision_at_k(
     are relevant to the topic.
     """
     logger.info(f"Computing Precision@{k}")
-    ### EXERCISE ###
-    # Compute how many of the top-K retrieved post IDs are in the set of topic_post_ids (i.e., hits)
+    # Retrieval may return < K results. This may be less than K
+    top_k_ids = retrieved_ids[:k]
+    if not top_k_ids:
+        return ComputePrecisionResp(precision=0.0, hits=0)
+    hits = sum(pid in topic_post_ids for pid in top_k_ids)
     return ComputePrecisionResp(
-        precision=0.0,  # Replace with computed precision
-        hits=0,  # Replace with computed hits
+        precision=hits / len(top_k_ids),
+        hits=hits,
     )
 
 
@@ -90,11 +93,13 @@ def compute_recall_at_k(
     the top-K results.
     """
     logger.info(f"Computing Recall@{k}")
-    ### EXERCISE ###
-    # Compute how many of the topic_post_ids are in the top-K retrieved post IDs (i.e., hits)
+    top_k_ids = retrieved_ids[:k]
+    if not topic_post_ids:
+        return ComputeRecallResp(recall=0.0, hits=0)
+    hits = sum(pid in topic_post_ids for pid in top_k_ids)
     return ComputeRecallResp(
-        recall=0.0,  # Replace with computed recall
-        hits=0,  # Replace with computed hits
+        recall=hits / len(topic_post_ids),
+        hits=hits,
     )
 
 
@@ -106,10 +111,9 @@ def compute_random_baseline(
     Computes the expected precision of a random baseline for a given topic.
     """
     logger.info("Computing Baseline Precision")
-    ### EXERCISE ###
-    # Compute the expected precision of a random baseline for a topic of this
-    # size within the dataset
-    return 0.0  # Replace with computed baseline precision
+    if dataset_size == 0:
+        return 0.0  # Avoid division by zero.
+    return topic_size / dataset_size
 
 
 class TopicSearchMetricArgs(BaseModel):
