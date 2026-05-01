@@ -6,6 +6,10 @@ poetry.lock
 .idea/
 *.swp
 
+# Agents
+.claude/
+.github/agents/
+
 # Linting/Formatter
 .ruff.local.toml
 
