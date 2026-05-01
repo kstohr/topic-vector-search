@@ -33,15 +33,16 @@ class Post(BaseModel):
 
 class PostDocument(Post):
     """
-    Structured post document. Inherits all fields from Post, with additional fields for downstream modeling.
-    - Deconstructs unstructured text and elements of the
-    raw post into structured fields.
+    Structured post document. Inherits all fields from Post, with additional fields
+    for downstream modeling.
+    - Deconstructs unstructured text and elements of the raw post into structured fields.
     - Methods to preprocess text
         - emoji conversion
         - lowercasing,
         - punctuation stripping
         - remove extra whitespace
-    Note: These methods may vary based on the documents being processed and the downstream modeling task.
+    Note: These methods may vary based on the documents being processed and the
+    downstream modeling task.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)

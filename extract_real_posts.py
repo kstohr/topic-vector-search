@@ -38,9 +38,7 @@ def _is_usable(text: str) -> bool:
     if not text or len(text.strip()) < MIN_TEXT_LEN:
         return False
     # Skip posts that are only a URL
-    if re.fullmatch(r"https?://\S+", text.strip()):
-        return False
-    return True
+    return not re.fullmatch(r"https?://\S+", text.strip())
 
 
 def main() -> None:
@@ -49,11 +47,12 @@ def main() -> None:
 
     posts = []
     skipped = 0
-    for pid, doc in raw.items():
+    for _pid, doc in raw.items():
         body = doc.get("body") or {}
         if isinstance(body, str):
             try:
                 import ast
+
                 body = ast.literal_eval(body)
             except Exception:
                 body = {}
@@ -63,17 +62,19 @@ def main() -> None:
             skipped += 1
             continue
 
-        posts.append({
-            "post_id":        doc["post_id"],
-            "post_author":    str(doc.get("post_author", "unknown")),
-            "created_at":     _normalise_ts(str(doc.get("created_at", ""))),
-            "modified_at":    _normalise_ts(str(doc.get("modified_at", ""))),
-            "post_text":      text,
-            "likes":          0,
-            "generated_topic": None,
-            "txt_embedding":  [],
-            "doc_embedding":  doc.get("doc_embedding") or [],
-        })
+        posts.append(
+            {
+                "post_id": doc["post_id"],
+                "post_author": str(doc.get("post_author", "unknown")),
+                "created_at": _normalise_ts(str(doc.get("created_at", ""))),
+                "modified_at": _normalise_ts(str(doc.get("modified_at", ""))),
+                "post_text": text,
+                "likes": 0,
+                "generated_topic": None,
+                "txt_embedding": [],
+                "doc_embedding": doc.get("doc_embedding") or [],
+            }
+        )
 
     OUT.write_text(json.dumps(posts, indent=2, ensure_ascii=False))
     print(f"Extracted {len(posts)} posts ({skipped} skipped) → {OUT}")

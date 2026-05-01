@@ -29,7 +29,7 @@ INDEX_BODY = {
 }
 
 
-def get_client() -> Elasticsearch:
+def get_es_client() -> Elasticsearch:
     """Return a new Elasticsearch client using the configured URL."""
     return Elasticsearch(ELASTICSEARCH_URL)
 

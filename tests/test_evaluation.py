@@ -100,43 +100,51 @@ def test_evaluate_topics_returns_one_row_per_topic(monkeypatch: pytest.MonkeyPat
 
 
 def test_build_search_result_rows_prefers_result_text_and_joins_topic() -> None:
-    rows = build_search_result_rows(SearchResultRowsArgs(
-        results=[{"post_id": "p1", "post_text": " Search result text ", "score": 0.87654}],
-        posts_by_id={
-            "p1": {"image_caption": "caption", "image_url": "https://example.com/img.jpg"}
-        },
-        assignments=pd.DataFrame({"post_id": ["p1"], "topic_id": [7]}),
-        labels={7: {"label": "Topic Seven"}},
-    ))
+    rows = build_search_result_rows(
+        SearchResultRowsArgs(
+            results=[{"post_id": "p1", "post_text": " Search result text ", "score": 0.87654}],
+            posts_by_id={
+                "p1": {"image_caption": "caption", "image_url": "https://example.com/img.jpg"}
+            },
+            assignments=pd.DataFrame({"post_id": ["p1"], "topic_id": [7]}),
+            labels={7: {"label": "Topic Seven"}},
+        )
+    )
 
-    assert rows == [SearchResultRow(
-        score=0.877,
-        post="Search result text",
-        topic="Topic Seven",
-        image_url="https://example.com/img.jpg",
-        post_id="p1",
-    )]
+    assert rows == [
+        SearchResultRow(
+            score=0.877,
+            post="Search result text",
+            topic="Topic Seven",
+            image_url="https://example.com/img.jpg",
+            post_id="p1",
+        )
+    ]
 
 
 def test_build_search_result_rows_uses_caption_when_text_is_missing() -> None:
-    rows = build_search_result_rows(SearchResultRowsArgs(
-        results=[{"post_id": "p2", "post_text": "", "score": 0.5}],
-        posts_by_id={"p2": {"image_caption": "a useful caption", "image_url": ""}},
-        assignments=pd.DataFrame({"post_id": ["p2"], "topic_id": [99]}),
-        labels={},
-    ))
+    rows = build_search_result_rows(
+        SearchResultRowsArgs(
+            results=[{"post_id": "p2", "post_text": "", "score": 0.5}],
+            posts_by_id={"p2": {"image_caption": "a useful caption", "image_url": ""}},
+            assignments=pd.DataFrame({"post_id": ["p2"], "topic_id": [99]}),
+            labels={},
+        )
+    )
 
     assert rows[0].post == "[image] a useful caption"
     assert rows[0].topic == "Topic 99"
 
 
 def test_build_search_result_rows_uses_placeholder_for_image_without_caption() -> None:
-    rows = build_search_result_rows(SearchResultRowsArgs(
-        results=[{"post_id": "missing", "score": 0.1}],
-        posts_by_id={},
-        assignments=pd.DataFrame({"post_id": [], "topic_id": []}),
-        labels={},
-    ))
+    rows = build_search_result_rows(
+        SearchResultRowsArgs(
+            results=[{"post_id": "missing", "score": 0.1}],
+            posts_by_id={},
+            assignments=pd.DataFrame({"post_id": [], "topic_id": []}),
+            labels={},
+        )
+    )
 
     assert rows[0].post == "[image — no caption yet]"
     assert rows[0].topic == ""

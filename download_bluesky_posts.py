@@ -40,9 +40,7 @@ def _is_usable(post: dict) -> bool:
     # Skip posts that are pure URLs
     if re.fullmatch(r"https?://\S+", text):
         return False
-    if not _looks_english(text):
-        return False
-    return True
+    return _looks_english(text)
 
 
 def _to_post_doc(post: dict) -> dict:

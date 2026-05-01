@@ -243,7 +243,8 @@ class PreprocessingPipeline:
         )
         # Store the embedding vector on the PostDocument
         for post, embedding in zip(posts, embeddings, strict=True):
-            # Convert the Numpy array to a list so it can be JSON-serialized and stored to Elasticsearch. When we load it back for modeling, we'll convert it back to a Numpy array.
+            # Convert the Numpy array to a list so it can be JSON-serialized and stored to
+            # Elasticsearch. When we load it back for modeling, we'll convert it back to an array.
             post.doc_embedding = embedding.tolist()
         return posts
 
