@@ -524,7 +524,7 @@ with st.sidebar:
     )
 
     st.toggle(
-        "Use topic keyword embeddings",
+        'Use "localized" embeddings',
         key="use_topic_keyword_embeddings",
         help=(
             "On: topic keyword embeddings from top keywords (topic_keyword_embeddings.json). "
