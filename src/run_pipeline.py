@@ -4,7 +4,13 @@ RUN END-TO-END PIPELINE
 ====================
 End-to-end pipeline: clear Elasticsearch index → preprocessing → topic modeling.
 
-Once you have run this, don't forget to clear the cache in the demo app to see the new results.
+This script runs the entire pipeline, including preprocessing and topic modeling, in sequence.
+Once you have run this, don't forget to clear the cache in the demo app to see
+the new results.
+
+If you are running this an encounter errors, try running the same file in
+/solutions.
+
 """
 
 from src.es_index import delete_index, get_es_client
