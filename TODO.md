@@ -1,6 +1,8 @@
 TODO: 
 
- - [ ] Email Sarah about contacting participants
+ - [ ] Email Sarah about contacting participants PROGRESS
+ - [ ] Check if Pamela Fox is free to TA with Chris PROGRESS
+ - [ ] Setup workshop dry run PROGRESS
  - [x] Copy existing main to PyBay branch
  - [x] Fix bug the localized embedding toggle doesn't work on results in topic view
  - [x] Fix keyword search in memory to split on words (tokens) and run search with OR for all keywords.
@@ -17,6 +19,8 @@ TODO:
  - [ ] Fix references to centroids PROGRESS
         - [x] Fix in workshop 
         - [ ] Fix in slides
+ - [ ] Add modified "sentence" embeddings to post for consistency with notebook
+   (time permits)
  - [ ] Add noise to posts (use sample posts, sample model)
 	 - [ ] Create a script that uses tfidf to get common words for top topics
 	 (cats, trains)
@@ -50,7 +54,10 @@ TODO:
  - [ ] Update run of show
  - [ ] Add KNN /cosine similarity slide to talk, notebook
  - [ ] Add restart/tear down instructions to README.md (progress) / TROUBLESHOOTING.md PROGRESS
- - [x] Check requirements and installation restrictions
+ - [ ] Check requirements and installation restrictions
+        - pin packages
+ - [ ] Create colab notebooks 
+ - [ ] Add bkp preprocess_posts.json to solutions and check-in
  - [ ] Refine Setup Instructions 
      - 6GB TO DOWNLOAD - Update docs
      - [ ] Update setup notebook to include instructions on switching python
