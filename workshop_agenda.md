@@ -15,8 +15,9 @@ Duration 3 hours
 | 5 | Topic Modeling with BERTopic | 25 min | [Notebook 3](notebooks/03_topic_modeling.ipynb) + Exercise 3: [train_topic_model](src/topic_model.py#L108) |
 | Break | Coffee break + Survey | 40 min | Survey after break |
 | 6 | Evaluating Topic Search Retrieval | 20 min | [Notebook 4](notebooks/04_search_evaluation.ipynb) + Exercise 4: [compute_precision_at_k](src/evaluation.py#L59), [compute_recall_at_k](src/evaluation.py#L83), [compute_random_baseline](src/evaluation.py#L101), [preprocess_text](src/data_models.py#L63) |
-| 7 | Including Images in Topic Search Retrieval (bonus) | 25 min | [Notebook 6](notebooks/06_images_bonus.ipynb) + Exercise 5: [_caption_single_post](src/preprocess.py#L98) |
-| 8 | Wrap-Up | 10 min + extra | |
+| 7 | Noise | 20 min | [Notebook 5](notebooks/06_images_bonus.ipynb), [generate_noise](src/generate_noise.py) |
+| 8 | Including Images in Topic Search Retrieval (bonus) | 10 min | [Notebook 6](notebooks/06_images_bonus.ipynb) + Exercise 5: [_caption_single_post](src/preprocess.py#L98) |
+| 9 | Wrap-Up | 10 min + extra | |
 | **Total** | | **180 min** | |
 
 
