@@ -40,7 +40,8 @@ from elasticsearch import Elasticsearch
 from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import CountVectorizer
 
-from src.ai_labeler import build_llm_representation
+from solutions.ai_labeler import build_llm_representation
+from solutions.preprocess import extract_embedding_text
 from src.config import (
     ELASTICSEARCH_URL,
 )
@@ -48,7 +49,6 @@ from src.config import (
     EMBEDDING_MODEL_NAME as EMBEDDING_MODEL,
 )
 from src.data_models import PostDocument
-from solutions.preprocess import extract_embedding_text
 from src.retrieve_postdocs import retrieve_postdocs_from_disk, retrieve_postdocs_from_elasticsearch
 
 logger = logging.getLogger(__name__)
