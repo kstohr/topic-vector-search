@@ -87,14 +87,14 @@ Source code can run without Docker:
   are used automatically when Elasticsearch is unavailable.
 
 - **Topic labels**: the pipeline falls back to KeyBERT keyword phrases if Ollama
-  is not running. If you have an OpenAI key, set `OPENAI_API_KEY` in `.env` and
+  is not running. If you have an OpenAI key, set `OPENAI_API_KEY` in `.env` or your env vars, and
   it will be used instead.
 
 ---
 
 ## Topic Label LLM 
 
-The topic modeling pipeline (`src/topic_model.py`) uses and LLM to label the
+The topic modeling pipeline (`src/topic_model.py`) uses an LLM to label the
 topics.  It picks a labeling backend in this order:
 
 | Priority | Condition | Model |
