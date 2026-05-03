@@ -48,7 +48,7 @@ from src.config import (
     EMBEDDING_MODEL_NAME as EMBEDDING_MODEL,
 )
 from src.data_models import PostDocument
-from src.preprocess import extract_embedding_text
+from solutions.preprocess import extract_embedding_text
 from src.retrieve_postdocs import retrieve_postdocs_from_disk, retrieve_postdocs_from_elasticsearch
 
 logger = logging.getLogger(__name__)
@@ -64,6 +64,8 @@ Based on the information above, extract a short but highly descriptive topic
 label of at most 3 words. Make sure it is in the following format:
 topic: <topic label>
 """
+
+TOP_N_SEARCH_EMBEDDING_KEYWORDS = 3
 
 
 class TopicModeler:
@@ -253,14 +255,17 @@ class TopicModeler:
 
     def _save_topic_embeddings(self, valid_ids: list[int]) -> None:
         """Write topic_embeddings.json from BERTopic's internal topic embedding matrix."""
+        if not hasattr(self.topic_model, "topic_embeddings_"):
+            raise AttributeError(
+                "topic_embeddings_ not found on topic model. "
+                "Check that the model is fitted before calling store_model_data()."
+            )
         # index 0 = outlier cluster, real topics start at 1
-        topic_embs = getattr(self.topic_model, "topic_embeddings_", None)
-        if topic_embs is None:
-            return
+        topic_embeddings = self.topic_model.topic_embeddings_
         topic_embedding_map = {
-            topic_id: topic_embs[topic_id + 1].tolist()
+            topic_id: topic_embeddings[topic_id + 1].tolist()
             for topic_id in valid_ids
-            if (topic_id + 1) < len(topic_embs)
+            if (topic_id + 1) < len(topic_embeddings)
         }
         with open(self.output_path / "topic_embeddings.json", "w") as f:
             json.dump(
@@ -272,7 +277,7 @@ class TopicModeler:
         """Write topic_keyword_embeddings.json by encoding each topic's top keywords."""
         topic_keyword_embs = {
             topic_id: self.embedding_model.encode(
-                " ".join(topic_keywords[:10]), convert_to_numpy=True
+                " ".join(topic_keywords[:TOP_N_SEARCH_EMBEDDING_KEYWORDS]), convert_to_numpy=True
             ).tolist()
             for topic_id, topic_keywords in keywords_by_topic.items()
         }

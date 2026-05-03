@@ -65,6 +65,8 @@ label of at most 3 words. Make sure it is in the following format:
 topic: <topic label>
 """
 
+TOP_N_SEARCH_EMBEDDING_KEYWORDS = 3
+
 
 class TopicModeler:
     """Orchestrates BERTopic training, artifact storage, and visualization."""
@@ -253,10 +255,13 @@ class TopicModeler:
 
     def _save_topic_embeddings(self, valid_ids: list[int]) -> None:
         """Write topic_embeddings.json from BERTopic's internal topic embedding matrix."""
+        if not hasattr(self.topic_model, "topic_embeddings_"):
+            raise AttributeError(
+                "topic_embeddings_ not found on topic model. "
+                "Check that the model is fitted before calling store_model_data()."
+            )
         # index 0 = outlier cluster, real topics start at 1
-        topic_embs = getattr(self.topic_model, "topic_embeddings_", None)
-        if topic_embs is None:
-            return
+        topic_embs = self.topic_model.topic_embeddings_
         topic_embedding_map = {
             topic_id: topic_embs[topic_id + 1].tolist()
             for topic_id in valid_ids
@@ -272,7 +277,7 @@ class TopicModeler:
         """Write topic_keyword_embeddings.json by encoding each topic's top keywords."""
         topic_keyword_embs = {
             topic_id: self.embedding_model.encode(
-                " ".join(topic_keywords[:10]), convert_to_numpy=True
+                " ".join(topic_keywords[:TOP_N_SEARCH_EMBEDDING_KEYWORDS]), convert_to_numpy=True
             ).tolist()
             for topic_id, topic_keywords in keywords_by_topic.items()
         }
