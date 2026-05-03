@@ -21,6 +21,7 @@ in real-time applications.
 ## Requirements
 
 - Python 3.12+
+- git
 - [uv](https://docs.astral.sh/uv/) package manager
 - Docker + Docker Compose
 
@@ -28,23 +29,23 @@ in real-time applications.
 
 ## Workshop Quick Start
 
-**Do this before the workshop** — it requires a ~2 GB download and can be slow on conference Wi-Fi.
+**Do this before the workshop** — items #1 and #2 requires at least ~15 GB download and can be very slow on conference Wi-Fi with many users.
 
-### 1. Install dependencies
+### 1. Install dependencies (~6 GB)
 
 ```bash
 uv sync
 ```
 
-### 2. Start Docker services (Elasticsearch + Ollama)
+### 2. Start Docker services (Elasticsearch + Ollama) (~7 GB)
 
 ```bash
 docker compose up -d
 ```
 
 This starts two containers:
-- **Elasticsearch** on port 9201 — vector database (optional, in-memory fallback provided)
-- **Ollama** on port 11434 — local LLM for topic labeling, automatically pulls `qwen2.5:3b` (~1.9 GB)
+- **Elasticsearch** on port 9201 — vector database (optional, in-memory fallback provided) (~1 GB)
+- **Ollama** on port 11434 — local LLM for topic labeling, automatically pulls `qwen2.5:3b` (~8GB: ~6 GB for docker + ~1.9 GB for qwen)
 
 > **No Docker?** All code should still work. Search uses an in-memory fallback and topic labels
 > fall back to keyword phrases. See the [No Docker path](#no-docker-no-problem) below.
