@@ -12,12 +12,16 @@ Steps:
   2. Caption any image-only posts that lack a caption (BLIP vision model)
   3. Batch-embed all posts (combines post_text + image_caption when both exist)
   4. Save to Elasticsearch (if running) and to output/processed_posts.json
+
+
 """
 
 import json
 import logging
+from pathlib import Path
 
 from elasticsearch import Elasticsearch
+from PIL import Image
 from sentence_transformers import SentenceTransformer
 from transformers import BlipForConditionalGeneration, BlipProcessor
 
@@ -31,6 +35,9 @@ from src.config import (
 from src.data_models import PostDocument
 
 logger = logging.getLogger(__name__)
+
+INPUT_FILEPATH = REPO / "sample_posts.json"
+OUTPUT_FILEPATH = OUTPUT / "processed_posts.json"
 
 
 def extract_embedding_text(postdoc: PostDocument) -> str:
@@ -53,8 +60,14 @@ def extract_embedding_text(postdoc: PostDocument) -> str:
 class PreprocessingPipeline:
     """End-to-end preprocessing pipeline: load → caption → embed → store."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        input_filepath: Path = INPUT_FILEPATH,
+        output_filepath: Path = OUTPUT_FILEPATH,
+    ) -> None:
         """Load models and attempt to connect to Elasticsearch."""
+        self.input_filepath = input_filepath
+        self.output_filepath = output_filepath
         self.elasticsearch_client = self._connect_elasticsearch()
         logger.info(f"Loading embedding model {EMBEDDING_MODEL_NAME}…")
         self.embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
@@ -91,8 +104,8 @@ class PreprocessingPipeline:
 
     def load_postdocs(self) -> list[PostDocument]:
         """Load raw posts from sample_posts.json and parse into PostDocument objects."""
-        logger.info("Loading sample_posts.json…")
-        with open(REPO / "sample_posts.json") as f:
+        logger.info(f"Loading {self.input_filepath}…")
+        with open(self.input_filepath) as f:
             return [PostDocument(**p) for p in json.load(f)]
 
     def _caption_single_post(self, postdoc: PostDocument) -> None:
@@ -110,12 +123,12 @@ class PreprocessingPipeline:
         if not postdoc.image_url:
             return
 
-        logger.info(f"Captioning image for post {postdoc.post_id}…")
-
         ### EXERCISE ###
-        # Load the image from the URL (hint: use PIL.Image)
-        # Use a vision model to generate a caption for the image (hint: use the processor and model)
-        # Store the caption on the postdoc (postdoc.image_caption = caption)
+        # Load the image from disk using PIL (hint: REPO / postdoc.image_url)
+        # Use self._vision_processor to prepare the image as a tensor
+        # Use self._vision_model.generate() to produce caption token IDs
+        # Decode the token IDs back to a string with self._vision_processor.decode()
+        # Store the result: postdoc.image_caption = caption
 
     def caption_images(self, postdocs: list[PostDocument]) -> list[PostDocument]:
         """Caption image-only posts"""
@@ -140,7 +153,7 @@ class PreprocessingPipeline:
         return postdocs
 
     def save_to_elasticsearch(self, postdocs: list[PostDocument]) -> None:
-        """Index all postdocs into Elasticsearch."""
+        """Index postdocs into Elasticsearch, skipping any already present."""
         from src.es_index import INDEX_NAME, create_index
 
         client = self.elasticsearch_client
@@ -148,17 +161,38 @@ class PreprocessingPipeline:
             return
 
         create_index(client)
-        for postdoc in postdocs:
+        new_postdocs = [
+            postdoc
+            for postdoc in postdocs
+            if not client.exists(index=INDEX_NAME, id=postdoc.post_id)
+        ]
+        for postdoc in new_postdocs:
             client.index(index=INDEX_NAME, id=postdoc.post_id, body=postdoc.model_dump(mode="json"))
-        logger.info(f"Stored {len(postdocs)} postdocs in Elasticsearch.")
+        logger.info(
+            f"Stored {len(new_postdocs)} new postdocs in Elasticsearch ({len(postdocs) - len(new_postdocs)} already present)."
+        )
 
     def save_processed_posts(self, postdocs: list[PostDocument]) -> None:
-        """Write output/processed_posts.json keyed by post_id for downstream steps."""
-        OUTPUT.mkdir(exist_ok=True)
-        doc_index = {postdoc.post_id: postdoc.model_dump(mode="json") for postdoc in postdocs}
-        with open(OUTPUT / "processed_posts.json", "w") as f:
-            json.dump(doc_index, f)
-        logger.info(f"Saved processed_posts.json ({len(doc_index)} postdocs).")
+        """Write processed posts to output_filepath, keyed by post_id.
+
+        Merges with any existing file, skipping post IDs already present.
+        """
+        self.output_filepath.parent.mkdir(exist_ok=True)
+        existing: dict = {}
+        if self.output_filepath.exists():
+            with open(self.output_filepath) as f:
+                existing = json.load(f)
+        new_docs = {
+            postdoc.post_id: postdoc.model_dump(mode="json")
+            for postdoc in postdocs
+            if postdoc.post_id not in existing
+        }
+        existing.update(new_docs)
+        with open(self.output_filepath, "w") as f:
+            json.dump(existing, f)
+        logger.info(
+            f"Saved {self.output_filepath.name} ({len(existing)} postdocs total, {len(new_docs)} new)."
+        )
 
     def run(self) -> None:
         """Run the full preprocessing pipeline: load → caption → embed → store."""
