@@ -20,10 +20,11 @@ in real-time applications.
 ---
 ## Requirements
 
-- Python 3.12+
-- git
-- [uv](https://docs.astral.sh/uv/) package manager
-- Docker + Docker Compose
+- [Python 3.12+](https://www.python.org/downloads/)
+- [git](https://git-scm.com/downloads) — git cli to clone the repo
+- [uv](https://docs.astral.sh/uv/getting-started/installation/) — package manager
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) — includes Docker Engine + Docker Compose for Mac, Windows, and Linux
+
 
 ---
 
