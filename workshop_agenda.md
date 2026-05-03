@@ -18,7 +18,7 @@ Duration 3 hours
 | 7 | Noise | 20 min | [Notebook 5](notebooks/06_images_bonus.ipynb), [generate_noise](src/generate_noise.py) |
 | 8 | Including Images in Topic Search Retrieval (bonus) | 10 min | [Notebook 6](notebooks/06_images_bonus.ipynb) + Exercise 5: [_caption_single_post](src/preprocess.py#L98) |
 | 9 | Wrap-Up | 10 min + extra | |
-| **Total** | | **180 min** | |
+| **Total** | | **180 min** | 
 
 
 ## Learning Objectives 
