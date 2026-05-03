@@ -172,14 +172,14 @@ class PreprocessingPipeline:
         """
         if not postdoc.image_url:
             return
-
         # Load the image from disk and convert to RGB (BLIP expects 3-channel input)
         img_path = REPO / postdoc.image_url
         if not img_path.exists():
             logger.warning(f"Image file not found: {img_path}")
             return
         logger.info(f"Captioning {img_path.name}…")
-        image = Image.open(img_path).convert("RGB")  # BLIP expects 3-channel RGB input
+        image = Image.open(img_path).convert("RGB")
+        logger.info(f"Captioning {img_path.name} (size: {image.size})…")
 
         # Process the image
         # Image is resized and normalized according to model requirements.
@@ -281,8 +281,9 @@ class PreprocessingPipeline:
         ]
         for postdoc in new_postdocs:
             client.index(index=INDEX_NAME, id=postdoc.post_id, body=postdoc.model_dump(mode="json"))
+        skipped = len(postdocs) - len(new_postdocs)
         logger.info(
-            f"Stored {len(new_postdocs)} new postdocs in Elasticsearch ({len(postdocs) - len(new_postdocs)} already present)."
+            f"Stored {len(new_postdocs)} new postdocs in Elasticsearch ({skipped} already present)."
         )
 
     def save_processed_posts(self, postdocs: list[PostDocument]) -> None:
@@ -304,7 +305,8 @@ class PreprocessingPipeline:
         with open(self.output_filepath, "w") as f:
             json.dump(existing, f)
         logger.info(
-            f"Saved {self.output_filepath.name} ({len(existing)} postdocs total, {len(new_docs)} new)."
+            f"Saved {self.output_filepath.name}"
+            f" ({len(existing)} postdocs total, {len(new_docs)} new)."
         )
 
     def run(self) -> None:
