@@ -21,7 +21,6 @@ import logging
 from pathlib import Path
 
 from elasticsearch import Elasticsearch
-from PIL import Image
 from sentence_transformers import SentenceTransformer
 from transformers import BlipForConditionalGeneration, BlipProcessor
 
@@ -123,8 +122,14 @@ class PreprocessingPipeline:
         if not postdoc.image_url:
             return
 
+        img_path = REPO / postdoc.image_url
+        if not img_path.exists():
+            logger.warning(f"Image file not found: {img_path}")
+            return
+        image = Image.open(img_path).convert("RGB")
+        logger.info(f"Captioning {img_path.name} (size: {image.size})…")
+
         ### EXERCISE ###
-        # Load the image from disk using PIL (hint: REPO / postdoc.image_url)
         # Use self._vision_processor to prepare the image as a tensor
         # Use self._vision_model.generate() to produce caption token IDs
         # Decode the token IDs back to a string with self._vision_processor.decode()
