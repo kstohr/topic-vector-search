@@ -287,7 +287,8 @@ class SearchResultRow(BaseModel):
 
     score: float
     post: str
-    topic: str
+    generated_topic: str
+    assigned_topic: str
     image_url: str
     post_id: str
 
@@ -325,7 +326,8 @@ def build_search_result_rows(args: SearchResultRowsArgs) -> list[SearchResultRow
             SearchResultRow(
                 score=round(result.get("score", 0), 3),
                 post=display_text,
-                topic=topic_label,
+                generated_topic=post.get("generated_topic", ""),
+                assigned_topic=topic_label,
                 image_url=post.get("image_url") or "",
                 post_id=post_id,
             )
