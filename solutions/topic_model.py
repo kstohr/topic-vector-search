@@ -37,8 +37,10 @@ from bertopic.representation import KeyBERTInspired
 from bertopic.representation import OpenAI as BertTopicOpenAI
 from bertopic.vectorizers import ClassTfidfTransformer
 from elasticsearch import Elasticsearch
+from hdbscan import HDBSCAN
 from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import CountVectorizer
+from umap import UMAP
 
 from solutions.ai_labeler import build_llm_representation
 from solutions.preprocess import extract_embedding_text
@@ -164,12 +166,28 @@ class TopicModeler:
         if llm_model:
             representation["LLM"] = llm_model
 
+        umap_model = UMAP(
+            n_neighbors=15,
+            n_components=2,
+            min_dist=0.0,
+            metric="cosine",
+            random_state=RANDOM_SEED,
+        )
+        hdbscan_model = HDBSCAN(
+            min_cluster_size=10,
+            min_samples=8,
+            metric="euclidean",
+            cluster_selection_method="eom",
+            prediction_data=True,
+        )
         self.topic_model = BERTopic(
             embedding_model=self.embedding_model,
+            umap_model=umap_model,
+            hdbscan_model=hdbscan_model,
             vectorizer_model=vectorizer,
             ctfidf_model=ClassTfidfTransformer(),
             representation_model=representation,
-            min_topic_size=10,
+            min_topic_size=5,
             n_gram_range=(1, 3),
             top_n_words=10,
             calculate_probabilities=True,
@@ -202,6 +220,7 @@ class TopicModeler:
         self._save_labels(valid_ids, keywords_by_topic)
         self._save_topic_embeddings(valid_ids)
         self._save_keyword_embeddings(keywords_by_topic)
+        self._save_topic_information()
         logger.info(f"All artifacts saved to {self.output_path}/")
 
     def _save_model(self) -> None:
@@ -274,18 +293,60 @@ class TopicModeler:
                 f,
             )
 
-    def _save_keyword_embeddings(self, keywords_by_topic: dict[int, list[str]]) -> None:
-        """Write topic_keyword_embeddings.json by encoding each topic's top keywords."""
+    def _save_keyword_embeddings(
+        self, keywords_by_topic: dict[int, list[str]]
+    ) -> dict[int, list[str]]:
+        """Write topic_keyword_embeddings.json using KeyBERT representation terms."""
+        _ = keywords_by_topic  # Kept for signature compatibility with current call sites.
+
+        if not self.topic_model.topic_aspects_:
+            raise AttributeError(
+                "topic_aspects_ not found on topic model. "
+                "Check that the model is fitted before calling store_model_data()."
+            )
+
+        aspects = self.topic_model.topic_aspects_
+        if not isinstance(aspects, dict) or not aspects.get("KeyBERT"):
+            raise AttributeError(
+                "KeyBERT topic aspects not found on topic model. "
+                "Check representation_model and confirm KeyBERT is enabled."
+            )
+        keybert_aspects = aspects["KeyBERT"]
+
+        top_keywords_by_topic: dict[int, list[str]] = {}
+        for topic_id, raw_terms in keybert_aspects.items():
+            tokens: list[str] = []
+            for item in raw_terms:
+                token = item[0] if isinstance(item, (list, tuple)) and item else str(item)
+                token = str(token).strip()
+                if token:
+                    tokens.append(token)
+            if tokens:
+                top_keywords_by_topic[int(topic_id)] = tokens[:TOP_N_SEARCH_EMBEDDING_KEYWORDS]
+
         topic_keyword_embs = {
             topic_id: self.embedding_model.encode(
-                " ".join(topic_keywords[:TOP_N_SEARCH_EMBEDDING_KEYWORDS]), convert_to_numpy=True
+                " ".join(topic_keywords), convert_to_numpy=True
             ).tolist()
-            for topic_id, topic_keywords in keywords_by_topic.items()
+            for topic_id, topic_keywords in top_keywords_by_topic.items()
         }
         with open(self.output_path / "topic_keyword_embeddings.json", "w") as f:
             json.dump(
                 {str(topic_id): embedding for topic_id, embedding in topic_keyword_embs.items()}, f
             )
+        return top_keywords_by_topic
+
+    def _save_topic_information(self) -> pd.DataFrame:
+        """Write topic_information.json with metadata about each topic."""
+        if self.topic_model.get_topic_info() is None:
+            raise AttributeError(
+                "topic_info_ not found on topic model. "
+                "Check that the model is fitted before calling store_model_data()."
+            )
+        # Access topic_info_ directly to ensure topic -1 (outliers) is included;
+        topic_info = self.topic_model.get_topic_info()
+        topic_info.to_csv(path_or_buf=self.output_path / "topic_information.csv", index=False)
+        return topic_info
 
     def generate_visualizations(self) -> None:
         """Write BERTopic HTML visualizations to output_path."""
