@@ -16,9 +16,15 @@ Once you have run this, don't forget to clear the cache in the demo app to see t
 from solutions.es_index import delete_index, get_es_client
 from solutions.preprocess import INPUT_FILEPATH, OUTPUT_FILEPATH, PreprocessingPipeline
 from solutions.topic_model import TopicModeler
-from src.config import OUTPUT
+from src.config import REPO
 
-NOISE_FILEPATH = OUTPUT / "noise_posts.json"
+### EXERCISE ###
+# Path to posts generated with additional random posts.
+# Replace INPUT_FILEPATH with NOISE_FILEPATH  in the PreprocessingPipeline below
+# This will add additional posts on random topics to the topic model training.
+# Explore how this affects search results!
+
+NOISE_FILEPATH = REPO / "sample_noise.json"
 
 
 def pipeline():
@@ -28,23 +34,9 @@ def pipeline():
     es_client = get_es_client()
     delete_index(client=es_client)
 
-    print("Remove existing processed_posts.json (if any)...")
-    if OUTPUT_FILEPATH.exists():
-        OUTPUT_FILEPATH.unlink()
-        print("Existing processed_posts.json removed.\n")
-    else:
-        print("No existing processed_posts.json found.\n")
-
     print("Running preprocessing pipeline on sample_posts.json...")
     PreprocessingPipeline(input_filepath=INPUT_FILEPATH, output_filepath=OUTPUT_FILEPATH).run()
     print("Preprocessing complete.\n")
-
-    if NOISE_FILEPATH.exists():
-        print("noise_posts.json found — preprocessing noise posts...")
-        PreprocessingPipeline(input_filepath=NOISE_FILEPATH, output_filepath=OUTPUT_FILEPATH).run()
-        print("Noise preprocessing complete.\n")
-    else:
-        print("No noise_posts.json found — skipping noise preprocessing.")
 
     print("Running topic modeling pipeline...")
     TopicModeler().run()
