@@ -147,7 +147,8 @@ class TopicModeler:
         logger.info(f"Training on {len(texts)} posts.")
 
         vectorizer = CountVectorizer(
-            min_df=2,
+            min_df=1,
+            max_df=1.0,
             ngram_range=(1, 3),
             stop_words="english",
         )
