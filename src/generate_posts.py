@@ -25,8 +25,10 @@ ASSETS_DIR = REPO / "assets"
 
 logger = logging.getLogger(__name__)
 
+RANDOM_SEED = 42
+random.seed(RANDOM_SEED)
 POSTS_PER_TOPIC = 20
-RANDOM_POST_COUNT = 30
+RANDOM_POST_COUNT = 40
 
 TOPICS = {
     "Cats, cats, cats": [
@@ -113,15 +115,15 @@ TOPICS = {
         "public transportation",
     ],
     "Open Water Swimming": [
-        "🏊‍♂️ OpenWater",
+        "🏊‍♂️ Open Water",
         "🌊 Swim",
         "🏅 Endurance",
-        "🚩 Buoy",
+        "🚩 Wetsuit",
         "⏱️ Timing",
         "🥶 Cold Water",
-        "🌅 SunriseSwim",
-        "🏞️ Nature",
-        "🐬 Wildlife",
+        "🌅 Sunrise Swim",
+        "neoprene",
+        "seal",
         "💪 Challenge",
         "Alcatraz",
         "tide charts",
@@ -217,6 +219,7 @@ class PostGenerator:
             ],
             max_tokens=1200,
             temperature=0.7,
+            seed=RANDOM_SEED,
         )
         if response.choices[0].message.content is None:
             raise ValueError(f"LLM returned no content for topic '{topic}'.")
@@ -248,8 +251,8 @@ class PostGenerator:
                 },
                 {"role": "user", "content": prompt},
             ],
-            max_tokens=1800,
-            temperature=0.7,
+            # max_tokens=1800,
+            temperature=1.0,
         )
         if response.choices[0].message.content is None:
             raise ValueError("LLM returned no content for random posts.")
