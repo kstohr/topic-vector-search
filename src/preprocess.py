@@ -49,7 +49,7 @@ def extract_embedding_text(postdoc: PostDocument) -> str:
     (e.g. post_id, image_url) are ignored.
     """
     # Extract the text elements to embed
-    text = postdoc.preprocess_text().strip()
+    text = postdoc.preprocess_text()
     # Check if the post has an image caption (i.e. image converted to text)
     caption = (postdoc.image_caption or "").strip()
     if text and caption:
