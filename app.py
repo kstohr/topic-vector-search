@@ -176,7 +176,7 @@ def load_raw_posts() -> list[dict]:
 
 @st.cache_data
 def load_posts_by_id() -> dict[str, dict]:
-    return {p["post_id"]: p for p in load_raw_posts()}
+    return {p["post_id"]: p for p in load_doc_index()}
 
 
 @st.cache_data
@@ -437,7 +437,10 @@ def render_results_eval(results: list[dict]) -> None:
         "post": st.column_config.TextColumn(
             "Post", width="large", help="The text content of the post."
         ),
-        "topic": st.column_config.TextColumn(
+        "generated_topic": st.column_config.TextColumn(
+            "Generated Topic", width="medium", help="The generated topic of the post, if available."
+        ),
+        "assigned_topic": st.column_config.TextColumn(
             "Topic", width="medium", help="The topic label assigned by BERTopic, if available."
         ),
     }

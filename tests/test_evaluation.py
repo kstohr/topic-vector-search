@@ -194,7 +194,8 @@ def test_build_search_result_rows_prefers_result_text_and_joins_topic() -> None:
         SearchResultRow(
             score=0.877,
             post="Search result text",
-            topic="Topic Seven",
+            generated_topic="",
+            assigned_topic="Topic Seven",
             image_url="https://example.com/img.jpg",
             post_id="p1",
         )
@@ -212,7 +213,7 @@ def test_build_search_result_rows_uses_caption_when_text_is_missing() -> None:
     )
 
     assert rows[0].post == "[image] a useful caption"
-    assert rows[0].topic == "Topic 99"
+    assert rows[0].assigned_topic == "Topic 99"
 
 
 def test_build_search_result_rows_uses_placeholder_for_image_without_caption() -> None:
@@ -226,7 +227,7 @@ def test_build_search_result_rows_uses_placeholder_for_image_without_caption() -
     )
 
     assert rows[0].post == "[image — no caption yet]"
-    assert rows[0].topic == ""
+    assert rows[0].assigned_topic == ""
     assert rows[0].image_url == ""
 
 
