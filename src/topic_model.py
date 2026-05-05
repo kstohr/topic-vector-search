@@ -281,12 +281,31 @@ class TopicModeler:
                 "topic_embeddings_ not found on topic model. "
                 "Check that the model is fitted before calling store_model_data()."
             )
-        # index 0 = outlier cluster, real topics start at 1
         topic_embeddings = self.topic_model.topic_embeddings_
+        topic_info = self.topic_model.get_topic_info()
+
+        # BERTopic's topic_embeddings_ array is positional, not keyed by topic id.
+        # Build a id->embedding mapping using topic_info row order.
+        topic_ids_in_order = [int(t) for t in topic_info["Topic"].tolist()]
+
+        if len(topic_embeddings) != len(topic_ids_in_order):
+            raise ValueError(
+                f"topic_embeddings_ length ({len(topic_embeddings)}) does not match "
+                f"topic_info Topic count ({len(topic_ids_in_order)}). "
+                "BERTopic internal state may be corrupted."
+            )
+
+        topic_embedding_map: dict[int, list[float]] = {
+            topic_id: embedding.tolist()
+            for topic_id, embedding in zip(topic_ids_in_order, topic_embeddings, strict=True)
+            if topic_id != -1
+        }
+
+        # Keep only valid non-outlier topics
         topic_embedding_map = {
-            topic_id: topic_embeddings[topic_id + 1].tolist()
+            topic_id: topic_embedding_map[topic_id]
             for topic_id in valid_ids
-            if (topic_id + 1) < len(topic_embeddings)
+            if topic_id in topic_embedding_map
         }
         with open(self.output_path / "topic_embeddings.json", "w") as f:
             json.dump(
