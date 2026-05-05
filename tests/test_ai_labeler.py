@@ -9,7 +9,7 @@ from src.config import OLLAMA_MODEL, OLLAMA_URL, OPENAI_MODEL
 class TestBuildLlmRepresentation:
     @patch("src.ai_labeler.BertTopicOpenAI")
     @patch("httpx.get")
-    @patch("openai.OpenAI")
+    @patch("src.ai_labeler.OpenAI")
     def test_prefers_ollama_when_available(
         self, mock_openai_client, mock_httpx_get, mock_bt_openai, monkeypatch
     ) -> None:
@@ -26,7 +26,7 @@ class TestBuildLlmRepresentation:
 
     @patch("src.ai_labeler.BertTopicOpenAI")
     @patch("httpx.get")
-    @patch("openai.OpenAI")
+    @patch("src.ai_labeler.OpenAI")
     def test_falls_back_to_openai_api_key(
         self, mock_openai_client, mock_httpx_get, mock_bt_openai, monkeypatch
     ) -> None:
@@ -45,7 +45,7 @@ class TestBuildLlmRepresentation:
         assert mock_bt_openai.call_args.kwargs["model"] == OPENAI_MODEL
 
     @patch("httpx.get")
-    @patch("openai.OpenAI")
+    @patch("src.ai_labeler.OpenAI")
     def test_returns_none_when_no_backend_available(
         self, mock_openai_client, mock_httpx_get, monkeypatch
     ) -> None:
