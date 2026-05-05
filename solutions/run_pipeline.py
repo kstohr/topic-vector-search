@@ -24,7 +24,9 @@ from src.config import REPO
 # This will add additional posts on random topics to the topic model training.
 # Explore how this affects search results!
 
+USE_INPUT = INPUT_FILEPATH
 NOISE_FILEPATH = REPO / "sample_noise.json"
+USE_INPUT = NOISE_FILEPATH  # --- SWITCH TO NOISE FILEPATH TO ADD RANDOM POSTS TO THE MIX ---
 
 
 def pipeline():
@@ -34,8 +36,8 @@ def pipeline():
     es_client = get_es_client()
     delete_index(client=es_client)
 
-    print("Running preprocessing pipeline on sample_posts.json...")
-    PreprocessingPipeline(input_filepath=INPUT_FILEPATH, output_filepath=OUTPUT_FILEPATH).run()
+    print(f"Running preprocessing pipeline on {USE_INPUT}...")
+    PreprocessingPipeline(input_filepath=USE_INPUT, output_filepath=OUTPUT_FILEPATH).run()
     print("Preprocessing complete.\n")
 
     print("Running topic modeling pipeline...")
