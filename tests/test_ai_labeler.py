@@ -44,9 +44,7 @@ class TestBuildLlmRepresentation:
         )
         assert mock_bt_openai.call_args.kwargs["model"] == OPENAI_MODEL
 
-    @patch("httpx.get")
-    @patch("src.ai_labeler.OpenAI")
-    def test_returns_none_when_no_backend_available(
+    @patch("httpx.get")    def test_returns_none_when_no_backend_available(
         self, mock_openai_client, mock_httpx_get, monkeypatch
     ) -> None:
         mock_httpx_get.side_effect = Exception("ollama down")
