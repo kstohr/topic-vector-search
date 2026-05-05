@@ -148,30 +148,18 @@ class TopicModeler:
         embeddings_np = np.array(embeddings, dtype=np.float32)
         logger.info(f"Training on {len(texts)} posts.")
 
-        vectorizer = CountVectorizer(
-            min_df=1,
-            max_df=1.0,
-            ngram_range=(1, 3),
-            stop_words="english",
-        )
-        keybert_model = KeyBERTInspired(
-            top_n_words=10,
-            nr_repr_docs=5,
-            nr_samples=500,
-            nr_candidate_words=100,
-            random_state=RANDOM_SEED,
-        )
-        llm_model: BertTopicOpenAI | None = build_llm_representation(prompt=LABEL_PROMPT)
-        representation = {"KeyBERT": keybert_model}
-        if llm_model:
-            representation["LLM"] = llm_model
-
         umap_model = UMAP(
             n_neighbors=15,
             n_components=2,
             min_dist=0.0,
             metric="cosine",
             random_state=RANDOM_SEED,
+        )
+        vectorizer = CountVectorizer(
+            min_df=1,
+            max_df=1.0,
+            ngram_range=(1, 3),
+            stop_words="english",
         )
         hdbscan_model = HDBSCAN(
             min_cluster_size=10,
@@ -180,6 +168,19 @@ class TopicModeler:
             cluster_selection_method="eom",
             prediction_data=True,
         )
+        keybert_model = KeyBERTInspired(
+            top_n_words=10,
+            nr_repr_docs=5,
+            nr_samples=500,
+            nr_candidate_words=100,
+            random_state=RANDOM_SEED,
+        )
+
+        llm_model: BertTopicOpenAI | None = build_llm_representation(prompt=LABEL_PROMPT)
+        representation = {"KeyBERT": keybert_model}
+        if llm_model:
+            representation["LLM"] = llm_model
+
         self.topic_model = BERTopic(
             embedding_model=self.embedding_model,
             umap_model=umap_model,
