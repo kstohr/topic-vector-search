@@ -11,6 +11,7 @@ from pathlib import Path
 
 from elasticsearch import Elasticsearch
 
+from src.config import OUTPUT
 from src.data_models import PostDocument
 from src.es_index import INDEX_NAME
 
@@ -47,7 +48,7 @@ def retrieve_postdocs_from_elasticsearch(es_client: Elasticsearch) -> dict[str, 
     return doc_index
 
 
-def retrieve_postdocs_from_disk(output_path: Path) -> dict[str, PostDocument]:
+def retrieve_postdocs_from_disk(output_path: Path = OUTPUT) -> dict[str, PostDocument]:
     """If Elasticsearch is unavailable, load post documents from
     output/processed_posts.json."""
     doc_index: dict[str, PostDocument] = {}

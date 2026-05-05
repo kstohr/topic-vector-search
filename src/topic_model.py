@@ -148,30 +148,18 @@ class TopicModeler:
         embeddings_np = np.array(embeddings, dtype=np.float32)
         logger.info(f"Training on {len(texts)} posts.")
 
-        vectorizer = CountVectorizer(
-            min_df=1,
-            max_df=1.0,
-            ngram_range=(1, 3),
-            stop_words="english",
-        )
-        keybert_model = KeyBERTInspired(
-            top_n_words=10,
-            nr_repr_docs=5,
-            nr_samples=500,
-            nr_candidate_words=100,
-            random_state=RANDOM_SEED,
-        )
-        llm_model: BertTopicOpenAI | None = build_llm_representation(prompt=LABEL_PROMPT)
-        representation = {"KeyBERT": keybert_model}
-        if llm_model:
-            representation["LLM"] = llm_model
-
         umap_model = UMAP(
             n_neighbors=15,
             n_components=2,
             min_dist=0.0,
             metric="cosine",
             random_state=RANDOM_SEED,
+        )
+        vectorizer = CountVectorizer(
+            min_df=1,
+            max_df=1.0,
+            ngram_range=(1, 3),
+            stop_words="english",
         )
         hdbscan_model = HDBSCAN(
             min_cluster_size=10,
@@ -180,6 +168,19 @@ class TopicModeler:
             cluster_selection_method="eom",
             prediction_data=True,
         )
+        keybert_model = KeyBERTInspired(
+            top_n_words=10,
+            nr_repr_docs=5,
+            nr_samples=500,
+            nr_candidate_words=100,
+            random_state=RANDOM_SEED,
+        )
+
+        llm_model: BertTopicOpenAI | None = build_llm_representation(prompt=LABEL_PROMPT)
+        representation = {"KeyBERT": keybert_model}
+        if llm_model:
+            representation["LLM"] = llm_model
+
         self.topic_model = BERTopic(
             embedding_model=self.embedding_model,
             umap_model=umap_model,
@@ -280,12 +281,31 @@ class TopicModeler:
                 "topic_embeddings_ not found on topic model. "
                 "Check that the model is fitted before calling store_model_data()."
             )
-        # index 0 = outlier cluster, real topics start at 1
         topic_embeddings = self.topic_model.topic_embeddings_
+        topic_info = self.topic_model.get_topic_info()
+
+        # BERTopic's topic_embeddings_ array is positional, not keyed by topic id.
+        # Build a id->embedding mapping using topic_info row order.
+        topic_ids_in_order = [int(t) for t in topic_info["Topic"].tolist()]
+
+        if len(topic_embeddings) != len(topic_ids_in_order):
+            raise ValueError(
+                f"topic_embeddings_ length ({len(topic_embeddings)}) does not match "
+                f"topic_info Topic count ({len(topic_ids_in_order)}). "
+                "BERTopic internal state may be corrupted."
+            )
+
+        topic_embedding_map: dict[int, list[float]] = {
+            topic_id: embedding.tolist()
+            for topic_id, embedding in zip(topic_ids_in_order, topic_embeddings, strict=True)
+            if topic_id != -1
+        }
+
+        # Keep only valid non-outlier topics
         topic_embedding_map = {
-            topic_id: topic_embeddings[topic_id + 1].tolist()
+            topic_id: topic_embedding_map[topic_id]
             for topic_id in valid_ids
-            if (topic_id + 1) < len(topic_embeddings)
+            if topic_id in topic_embedding_map
         }
         with open(self.output_path / "topic_embeddings.json", "w") as f:
             json.dump(

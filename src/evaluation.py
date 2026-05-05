@@ -228,6 +228,9 @@ def evaluate_topics(args: TopicEvalArgs) -> pd.DataFrame:
 
     rows = []
     for topic_id, info in sorted(labels.items()):
+        if topic_id not in topic_embeddings:
+            raise ValueError(f"Missing embedding for topic_id {topic_id}")
+
         topic_embedding = np.array(topic_embeddings[topic_id], dtype=np.float32)
         assigned = assigned_by_topic.get(topic_id, set())
         topic_keywords = keywords.get(topic_id, [])[:10] if keywords else []

@@ -12,6 +12,8 @@ import logging
 import os
 
 from bertopic.representation import OpenAI as BertTopicOpenAI
+import httpx
+from openai import OpenAI
 
 from src.config import (
     OLLAMA_MODEL,
@@ -29,8 +31,6 @@ def build_llm_representation(prompt: str) -> BertTopicOpenAI | None:
       2. OpenAI (OPENAI_API_KEY env var)
       3. None → KeyBERT-only labels
     """
-    import httpx
-    from openai import OpenAI
 
     try:
         resp = httpx.get(OLLAMA_URL.replace("/v1", "/api/tags"), timeout=2)
