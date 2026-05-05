@@ -20,31 +20,33 @@ in real-time applications.
 ---
 ## Requirements
 
-- Python 3.12+
-- [uv](https://docs.astral.sh/uv/) package manager
-- Docker + Docker Compose
+- [Python 3.12+](https://www.python.org/downloads/)
+- [git](https://git-scm.com/downloads) — git cli to clone the repo
+- [uv](https://docs.astral.sh/uv/getting-started/installation/) — package manager
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) — includes Docker Engine + Docker Compose for Mac, Windows, and Linux
+
 
 ---
 
 ## Workshop Quick Start
 
-**Do this before the workshop** — it requires a ~2 GB download and can be slow on conference Wi-Fi.
+**Do this before the workshop** — items #1 and #2 requires at least ~15 GB download and can be very slow on conference Wi-Fi with many users.
 
-### 1. Install dependencies
+### 1. Install dependencies (~6 GB)
 
 ```bash
 uv sync
 ```
 
-### 2. Start Docker services (Elasticsearch + Ollama)
+### 2. Start Docker services (Elasticsearch + Ollama) (~7 GB)
 
 ```bash
 docker compose up -d
 ```
 
 This starts two containers:
-- **Elasticsearch** on port 9201 — vector database (optional, in-memory fallback provided)
-- **Ollama** on port 11434 — local LLM for topic labeling, automatically pulls `qwen2.5:3b` (~1.9 GB)
+- **Elasticsearch** on port 9201 — vector database (optional, in-memory fallback provided) (~1 GB)
+- **Ollama** on port 11434 — local LLM for topic labeling, automatically pulls `qwen2.5:3b` (~8GB: ~6 GB for docker + ~1.9 GB for qwen)
 
 > **No Docker?** All code should still work. Search uses an in-memory fallback and topic labels
 > fall back to keyword phrases. See the [No Docker path](#no-docker-no-problem) below.
@@ -85,14 +87,14 @@ Source code can run without Docker:
   are used automatically when Elasticsearch is unavailable.
 
 - **Topic labels**: the pipeline falls back to KeyBERT keyword phrases if Ollama
-  is not running. If you have an OpenAI key, set `OPENAI_API_KEY` in `.env` and
+  is not running. If you have an OpenAI key, set `OPENAI_API_KEY` in `.env` or your env vars, and
   it will be used instead.
 
 ---
 
 ## Topic Label LLM 
 
-The topic modeling pipeline (`src/topic_model.py`) uses and LLM to label the
+The topic modeling pipeline (`src/topic_model.py`) uses an LLM to label the
 topics.  It picks a labeling backend in this order:
 
 | Priority | Condition | Model |
