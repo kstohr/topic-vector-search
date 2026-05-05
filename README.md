@@ -24,6 +24,7 @@ in real-time applications.
 - [git](https://git-scm.com/downloads) — git cli to clone the repo
 - [uv](https://docs.astral.sh/uv/getting-started/installation/) — package manager
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) — includes Docker Engine + Docker Compose for Mac, Windows, and Linux
+- **Machine resources**: ~20 GB free disk and 8 GB RAM (workshop downloads ~13 GB total). On Mac/Windows, ensure Docker Desktop has at least 4 GB allocated under Settings → Resources.
 
 
 ---

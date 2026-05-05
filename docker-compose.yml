@@ -2,7 +2,6 @@ services:
 # https://www.elastic.co/guide/en/elasticsearch/reference/current/docker.html
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
-    container_name: elasticsearch-1
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
@@ -10,10 +9,11 @@ services:
       - ES_JAVA_OPTS=-Xms512m -Xmx512m
     ports:
       - 9201:9200
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
 
   ollama:
     image: ollama/ollama:latest
-    container_name: ollama-1
     ports:
       - 11434:11434
     volumes:
@@ -22,4 +22,5 @@ services:
     entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 5 && ollama pull qwen2.5:3b && wait"]
 
 volumes:
+  elasticsearch_data:
   ollama_data:
