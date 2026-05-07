@@ -66,8 +66,6 @@ class PostDocument(Post):
         prior to modeling. Does not include sentence splitting. If sentence
         embeddings are needed use `preprocess_sentences`.
         """
-        ### EXERCISE ###
-        # Add or remove preprocessing steps to clean text
         if text is None:
             text = self.post_text
         text = emoji.demojize(text).replace("_", " ")
