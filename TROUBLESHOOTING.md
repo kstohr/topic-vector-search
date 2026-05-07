@@ -173,6 +173,28 @@ there is a coding error in your message such that embeddings were not generated.
 You may also want to check that you are storing PostDocuments as json.
 BadRequest error can indicate a field mapping error. 
 
+
+## Elasticsearch Issues 
+
+1. First check that documents are stored on Elasticsearch: 
+
+```
+# Running the main block on es_index checks the document count.
+uv run python -m src.es_index
+``` 
+
+## Deleting documents 
+
+If for some reason you need to delete all documents on the index, run: 
+
+```
+from src.es_index import get_es_client, count_documents
+es_client = get_es_client()
+delete_index(es_client)
+```
+
+One thing to note: deleting the index also deletes the mapping. `create_index`  recreates it before indexing new documents
+
 ## Sample Post Issues 
 If you accidentally made a change that corrupted or deleted `src/sample_posts.json` or
 `noise_posts.json` You can either git restore the changes to those files. 
