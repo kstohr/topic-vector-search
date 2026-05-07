@@ -2,7 +2,7 @@ TODO:
 
  - [ ] Contact participants about setup 
  - [ ] Check if Pamela Fox is free to TA with Chris PROGRESS
--  [] Send Chris windows tickets 
+-  [x] Send Chris windows tickets 
        - https://github.com/kstohr/topic-vector-search/issues/10
        - https://github.com/kstohr/topic-vector-search/issues/11
 
