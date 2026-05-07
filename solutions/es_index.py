@@ -67,15 +67,7 @@ def count_documents(client: Elasticsearch) -> int:
 
 
 if __name__ == "__main__":
-    logger = logging.getLogger(__name__)
     logging.basicConfig(level=logging.INFO)
     es_client = get_es_client()
     count = count_documents(es_client)
     logger.info(f"Index contains {count} documents.")
-
-    # Run this to reset the Elasticsearch index
-    # logger = logging.getLogger(__name__)
-    # logging.basicConfig(level=logging.INFO)
-    # es_client = get_es_client()
-    # delete_index(es_client)
-    # logger.info("Index reset complete.")
