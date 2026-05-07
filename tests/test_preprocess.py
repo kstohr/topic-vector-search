@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
 from PIL import Image
 
 from src.data_models import PostDocument
-from src.preprocess import PreprocessingPipeline, extract_embedding_text
+from src.preprocess import (
+    PostDocMissingEmbeddingError,
+    PreprocessingPipeline,
+    extract_embedding_text,
+)
 
 BASE_POST = {
     "post_id": "x",
@@ -206,6 +211,52 @@ class TestGenerateEmbeddings:
         pipeline.generate_embeddings(postdocs)
 
         assert fake_embedding_model.called is True
+
+
+class TestSaveToElasticsearch:
+    """Tests for PreprocessingPipeline.save_to_elasticsearch()."""
+
+    def test_skips_when_no_es_client(self) -> None:
+        pipeline = PreprocessingPipeline.__new__(PreprocessingPipeline)
+        pipeline.elasticsearch_client = None
+        # Should return without error when there is no Elasticsearch client.
+        pipeline.save_to_elasticsearch([make()])
+
+    def test_raises_postdoc_missing_embedding_error_on_dimension_mismatch(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        class _FakeBadRequestError(Exception):
+            def __str__(self) -> str:
+                return "dimension 2 does not match expected dimension 384"
+
+        monkeypatch.setattr("src.preprocess.BadRequestError", _FakeBadRequestError)
+        monkeypatch.setattr("src.preprocess.create_index", lambda c: None)
+
+        mock_client = MagicMock()
+        mock_client.index.side_effect = _FakeBadRequestError()
+
+        pipeline = PreprocessingPipeline.__new__(PreprocessingPipeline)
+        pipeline.elasticsearch_client = mock_client
+
+        with pytest.raises(PostDocMissingEmbeddingError):
+            pipeline.save_to_elasticsearch([make()])
+
+    def test_reraises_unrelated_bad_request_errors(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        class _FakeBadRequestError(Exception):
+            def __str__(self) -> str:
+                return "some other bad request error"
+
+        monkeypatch.setattr("src.preprocess.BadRequestError", _FakeBadRequestError)
+        monkeypatch.setattr("src.preprocess.create_index", lambda c: None)
+
+        mock_client = MagicMock()
+        mock_client.index.side_effect = _FakeBadRequestError()
+
+        pipeline = PreprocessingPipeline.__new__(PreprocessingPipeline)
+        pipeline.elasticsearch_client = mock_client
+
+        with pytest.raises(_FakeBadRequestError):
+            pipeline.save_to_elasticsearch([make()])
 
 
 def test_clear_stored_outputs_deletes_file_and_es_index(
