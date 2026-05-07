@@ -1,24 +1,22 @@
 TODO: 
 
- - [ ] Email Sarah about contacting participants PROGRESS
+ - [ ] Contact participants about setup 
  - [ ] Check if Pamela Fox is free to TA with Chris PROGRESS
- - [x] Setup workshop dry run DONE
- - [x] Copy existing main to PyBay branch
- - [x] Fix bug the localized embedding toggle doesn't work on results in topic view
- - [x] Fix keyword search in memory to split on words (tokens) and run search with OR for all keywords.
- - [x] Commit working streamlit
- - [ ] Implement precision/recall metric
-	 - [x] In workshop
-	 - [ ] In notebook PROGRESS
- - [x] Write cleaner code; each method does one task well and only one task. Create classes
+-  [] Send Chris windows tickets 
+       - https://github.com/kstohr/topic-vector-search/issues/10
+       - https://github.com/kstohr/topic-vector-search/issues/11
+
+ - [x] Write cleaner code; each method does one task well and only one task.
+        - [ ] Create classes
 	 - [ ] Review modules for and ensure raise errors clearly and quickly. Error messages should guide attendees on how to fix the problem ("Run preprocessing.py and try again.") or ("Check the paramters passed to BERTopic model.")
 	 - [ ] Ensure every module has logging
 	 - [ ] Ok in preprocessing.py and related tests. We often refer to a PostDocument object as a "post" this is confusing. We should always refer to a Post object as "post" and a PostDocument object as a "postdoc" PROGRESS
 	 - [ ] Check for repeated code lines. Is there an existing method we can use instead?
  - [ ] Fix references to centroids PROGRESS
         - [x] Fix in workshop 
-        - [ ] Fix in slides
- - [ ] Add modified "sentence" embeddings to post for consistency with notebook
+        - [x] Fix in slides
+ - [x] Add modified "sentence" embeddings to post for consistency with notebook
+        - handled in notebook; reference code in PostDocument model
    (time permits) (Notebook only)
  - [x] Add noise to posts (use sample posts, sample model)
 	 - [ ] Create a script that uses tfidf to get common words for top topics
@@ -30,19 +28,13 @@ TODO:
      - [ ] Add numbers 99 address, 99 Red Balloons, etc. 
            - Add PII (should we really cluster on a person's name if it's just
            an
-           - Add demoji fix to notebook code. 
      - [ ] Mexican Woman Presidential Bid - update slide to show improving prompt.
        @mention, or a name in say a copyright notice?)
- - [x] Add noise to agenda and [run of show] (https://docs.google.com/spreadsheets/d/1Yo4mmH4ojbLEFRLpCZeK9xkWJ2fLJxvNpKJPdO9My04/edit?gid=444788039#gid=444788039)
- - [x] Identify placeholder code for workshop - refactor to label and isolate methods. Ensure that tests exist for each method.
-	 - [x] uv run pytest -m "not exercise"
  - [ ] Review comments for stupid AI stuff PROGRESS
- - [x] Create solutions files (preprocessing, evaluation)
-	 - [x ] Will add exercise to data_model.py, topic_model.py, inline.
  - [ ] Create explainer notebooks PROGRESS
-        - [ ] Keyword vs Semantic Search (explain cosine similarity scoring)
-        - [ ] What is an embedding exactly? 
-        - [ ] Training a topic model 
+        - [x] Keyword vs Semantic Search (explain cosine similarity scoring)
+        - [ x] What is an embedding exactly? 
+        - [ x] Training a topic model 
             - Exercise instructions: 
                 - small examples, try this ... does this happen? 
                     - changing the min-num of docs per topic (break)
@@ -50,22 +42,20 @@ TODO:
                     break)
                     - changing the representation LLM prompt ('It's opposite
                     day!" )
-        - [ ] Evaluating search retrieval 
-        - [ ] Dealing with Noise 
-        - [ ] Searching for images.. (bonus)
-        - [ ] Add images from slides inline in notebooks (if time permits)
+        - [ x] Evaluating search retrieval 
+        - [ x] Dealing with Noise 
+        - [ x] Searching for images.. (bonus)
+        - [ ] Add images from slides inline in notebooks (if time permits) PROGRESS
  - [ ] Create GLOSSARY.MD PROGRESS
  - [ ] Create FAQ.md PROGRESS
  - [ ] Create Troubleshooting.md PROGRESS
  - [ ] Update run of show
- - [x] Add KNN /cosine similarity to notebook
-       - add to slide if time persists.
  - [ ] Add restart/tear down instructions to README.md (progress) / TROUBLESHOOTING.md PROGRESS
  - [ ] Check requirements and installation restrictions
         - pin packages
- - [ ] Create colab notebooks 
+ - [ ] github.com/codespaces (free tier)
  - [ ] Add bkp preprocess_posts.json to solutions and check-in
- - [ ] Refine Setup Instructions 
+ - [ x] Refine Setup Instructions 
      - 6GB TO DOWNLOAD - Update docs
      - [ ] Update setup notebook to include instructions on switching python
        versions, 
@@ -78,4 +68,52 @@ TODO:
  - [ ] Plan softball Q's for TA's add to run of show
  - [ ] Add wrap up slide ... we did this, this and this. 
         - If you want to learn more, do this, this and this.
+ - [ ] Add side-by-side search comparison toggle to app
+ - [ ] Test what would happen if you ran the same package on python 3.13 or 3.14
+   in case someone has a newer python interpreter and doesn't change it. 
+-  [ ] Add global reset command 
+       - check global reset command -  does it reset everything needed?  does it
+       rebuild? 
+       -- TODO: create helper file to reset elastic, etc.. to keep users out of
+       code
+-  [ ] Add workshop teardown script/notebook 
+       - shutdown app 
+       - remove Ollama cached model 
+       - remove docker containers 
+       - remove docker images 
+       - remove root dir 
+-  [ ] Add "housekeeping" slide to deck 
+       - check attendees have completed setup 
+       - review agenda 
+       - review repo 
+       - explain flow (demo app, notebook, complete exercises, demo app,
+       notebook, complete exercises... bonus: caption images)
+- [ ] [Global] Add '!command' to run necessary setup at start of notebook, end
+  of notebook 
+       -- notebook_03 WINDOWS -- Step 0 - file path error  ==> USER did not run preprocessing from notebook_02  add try/except?  add reset function...
+- [x] draft bug; not overwriting elastic search (preprocessing.py) -- causes
+  people to think that it has not been run, because zero docs are uploaded to
+  demo app --  expected; replace strategy not upsert
+       - ERROR: notebook_02 and _03; doc embedding error; there are already docs in ES, fix is to delete the docs... in the code - use file: es_index.py, with function - delete_index ....run that function -
+- [ ] Move postdoc model from code into notebook_02 with structured docs -- so
+  that when user changes code they don't mess with source pipeline
+- [ ] check location of notebook_02- preprocessing code; missing - expected to
+  be in the notebook
+- [ ] Add instructions to run pytest for methods in exercises
+  (generate_embedding(), success metrics, vision)
+- [ ] Add common preprocessing, topic model errors to troubleshooting
+  (dimensions=0 almost always means the embeddings are not available)
+- [ ] Add pre-run checks at top of notebooks 
+- [x] fix patch on test_ai_labeler (2nd test after windows error)
+- [x] fix DeprecationWarning: datetime.datetime.utcnow() (not a windows error)
+- [x] fix ERROR at setup of TestBuildLlmRepresentation.test_returns_none_when_no_backend_available fixture 'mock_httpx_get' not found
+- [x] setup check:  WINDOWS:  pytest fails, exit code 2; fix:
+tests/test_ai_labeler.py line 47-- add newline 
+       - comes from a test function/decorator mismatch in test_ai_labeler.py,
+       not from the OS. 
+- [ ] notebook_03:  need HDDBSCAN image for Step 2 to make concept of balancing
+  good matches with clusters make sense...
+- [X] Handle FileNotFoundError if processed_posts.json not available. Raise specific ProcessedPostsNotFoundError when topic_model.py cannot
+  import posts. 
+
 
