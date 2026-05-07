@@ -173,10 +173,24 @@ there is a coding error in your message such that embeddings were not generated.
 You may also want to check that you are storing PostDocuments as json.
 BadRequest error can indicate a field mapping error. 
 
+## Sample Post Issues 
+If you accidentally made a change that corrupted or deleted `src/sample_posts.json` or
+`noise_posts.json` You can either git restore the changes to those files. 
+
+```
+git restore sample_posts.json
+# OR 
+git restore sample_noise.json
+```
+If that is not possible copy the backup versions in `solutions/`: 
+
+`solutions/sample_posts.json.bkp`
+`solutions/sample_noise.json.bkp`
+
 ## Pytest 
 
 The ResourceTracker warning at the end is a known Python 3.12 bug in the 
-multiprocess package — unrelated to the code.
+multiprocess package — unrelated to the code. Safe to ignore.
 
 ## Reset Workspace - ("nuclear option")
 
