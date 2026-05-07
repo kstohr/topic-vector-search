@@ -187,7 +187,8 @@ class PreprocessingPipeline:
             for postdoc in postdocs
         ):
             logger.warning(
-                "Embedding dimension mismatch — check your implementation. Did you convert the np.array output of the embedding model to a list?"
+                "Embedding dimension mismatch — check your implementation. "
+                "Did you convert the np.array output of the embedding model to a list?"
             )
         return postdocs
 

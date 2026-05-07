@@ -15,9 +15,9 @@ Once you have run this, don't forget to clear the cache in the demo app to see t
 
 from pathlib import Path
 
+from src.config import REPO
 from src.preprocess import INPUT_FILEPATH, OUTPUT_FILEPATH, PreprocessingPipeline
 from src.topic_model import TopicModeler
-from src.config import REPO
 
 ### EXERCISE ###
 # Path to posts generated with additional random posts.

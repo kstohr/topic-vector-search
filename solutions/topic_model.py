@@ -70,6 +70,12 @@ topic: <topic label>
 TOP_N_SEARCH_EMBEDDING_KEYWORDS = 3
 
 
+class ProccessedPostsNotFoundError(FileNotFoundError):
+    """Raised when processed_posts.json is missing for topic model training."""
+
+    pass
+
+
 class TopicModeler:
     """Orchestrates BERTopic training, artifact storage, and visualization."""
 
@@ -104,7 +110,10 @@ class TopicModeler:
         if self.elasticsearch_client:
             self.doc_index = retrieve_postdocs_from_elasticsearch(self.elasticsearch_client)
             return self.doc_index
-        self.doc_index = retrieve_postdocs_from_disk(output_path=self.output_path)
+        try:
+            self.doc_index = retrieve_postdocs_from_disk(output_path=self.output_path)
+        except FileNotFoundError as error:
+            raise ProccessedPostsNotFoundError("Make sure you have run preprocessing.py") from error
         return self.doc_index
 
     # ── Model training ─────────────────────────────────────────────────────
