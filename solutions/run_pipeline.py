@@ -13,31 +13,20 @@ Steps:
 Once you have run this, don't forget to clear the cache in the demo app to see the new results.
 """
 
-from solutions.es_index import delete_index, get_es_client
+from pathlib import Path
+
 from solutions.preprocess import INPUT_FILEPATH, OUTPUT_FILEPATH, PreprocessingPipeline
 from solutions.topic_model import TopicModeler
 from src.config import REPO
 
-### EXERCISE ###
-# Path to posts generated with additional random posts.
-# Replace INPUT_FILEPATH with NOISE_FILEPATH  in the PreprocessingPipeline below
-# This will add additional posts on random topics to the topic model training.
-# Explore how this affects search results!
-
-USE_INPUT = INPUT_FILEPATH
 NOISE_FILEPATH = REPO / "sample_noise.json"
-USE_INPUT = NOISE_FILEPATH  # --- SWITCH TO NOISE FILEPATH TO ADD RANDOM POSTS TO THE MIX ---
 
 
-def pipeline():
+def pipeline(use_input: Path = INPUT_FILEPATH, use_output: Path = OUTPUT_FILEPATH):
     """Run preprocessing then topic modeling in sequence."""
 
-    print("Deleting existing Elasticsearch index (if any)...")
-    es_client = get_es_client()
-    delete_index(client=es_client)
-
-    print(f"Running preprocessing pipeline on {USE_INPUT}...")
-    PreprocessingPipeline(input_filepath=USE_INPUT, output_filepath=OUTPUT_FILEPATH).run()
+    print(f"Running preprocessing pipeline on {use_input}...")
+    PreprocessingPipeline(input_filepath=use_input, output_filepath=use_output).run()
     print("Preprocessing complete.\n")
 
     print("Running topic modeling pipeline...")
@@ -48,4 +37,9 @@ def pipeline():
 
 
 if __name__ == "__main__":
+    NOISE_INPUT: Path = NOISE_FILEPATH
     pipeline()
+
+    # --- SWITCH TO NOISE FILEPATH TO ADD RANDOM POSTS TO THE MIX ---
+
+    # pipeline(use_input=NOISE_INPUT)
