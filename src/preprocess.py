@@ -33,6 +33,7 @@ from src.config import (
     VISION_MODEL_NAME,
 )
 from src.data_models import PostDocument
+from src.es_index import INDEX_NAME, create_index, delete_index
 
 logger = logging.getLogger(__name__)
 
@@ -78,11 +79,14 @@ class PreprocessingPipeline:
 
     def _load_vision_model(self) -> tuple:
         """Load vision model processor and model for image captioning."""
+
+        # Instantiate the processor for image preprocessing and preparing tensor inputs
         processor = BlipProcessor.from_pretrained(
             VISION_MODEL_NAME,
             use_fast=False,  # fast image processor incompatible so we disable it.
             use_fast_tokenizer=True,
         )
+        # Instantiate the vision model for image captioning
         model = BlipForConditionalGeneration.from_pretrained(
             VISION_MODEL_NAME,
             use_safetensors=True,
@@ -127,6 +131,7 @@ class PreprocessingPipeline:
         if not img_path.exists():
             logger.warning(f"Image file not found: {img_path}")
             return
+        logger.info(f"Opening {img_path.name}…")
         image = Image.open(img_path).convert("RGB")
         logger.info(f"Captioning {img_path.name} (size: {image.size})…")
 
@@ -135,6 +140,7 @@ class PreprocessingPipeline:
         # Use self._vision_model.generate() to produce caption token IDs
         # Decode the token IDs back to a string with self._vision_processor.decode()
         # Store the result: postdoc.image_caption = caption
+        # You can run `uv run pytest -k TestCaptionSinglePost` to test your implementation.
 
     def caption_images(self, postdocs: list[PostDocument]) -> list[PostDocument]:
         """Caption image-only posts"""
@@ -151,56 +157,56 @@ class PreprocessingPipeline:
         Embed all postdocs using the embedding model.
         """
         logger.info(f"Embedding {len(postdocs)} postdocs…")
+
         ### EXERCISE ###
-        # For each postdoc, extract the text to embed (hint: use the
+        # Posts are loaded and converted to PostDocument objects in
+        # load_postdocs() and passed to this function as a list.
+        #
+        # For each postdoc:
+        # 1. . extract the text to embed (hint: use the
         # extract_embedding_text function above)
-        # Use the embedding model to generate an embedding vector for the text
-        # Store the embedding vector on the postdoc (postdoc.doc_embedding = embedding)
+        # 2. Use the embedding model to generate an embedding vector for the text
+        # 3. Store the embedding vector on the postdoc (postdoc.doc_embedding =
+        #    embedding)
+        # You can run `uv run pytest -k TestGenerateEmbeddings`
+        # to test your implementation.
+
         return postdocs
 
+    def clear_stored_outputs(self) -> None:
+        """Delete existing output file and Elasticsearch index (if any)."""
+        # Delete existing Elasticsearch index (if any)
+        if self.elasticsearch_client:
+            logger.info("Deleting existing Elasticsearch index (if any)...")
+            delete_index(client=self.elasticsearch_client)
+
+        # Delete existing output file (if any)
+        if self.output_filepath.exists():
+            self.output_filepath.unlink()
+            logger.info(f"Deleted existing output file at {self.output_filepath}.")
+
     def save_to_elasticsearch(self, postdocs: list[PostDocument]) -> None:
-        """Index postdocs into Elasticsearch, skipping any already present."""
-        from src.es_index import INDEX_NAME, create_index
+        """Index postdocs into Elasticsearch."""
 
-        client = self.elasticsearch_client
-        if client is None:
-            return
+        if self.elasticsearch_client:
+            logger.info("Elasticsearch available — saving postdocs.")
 
-        create_index(client)
-        new_postdocs = [
-            postdoc
-            for postdoc in postdocs
-            if not client.exists(index=INDEX_NAME, id=postdoc.post_id)
-        ]
-        for postdoc in new_postdocs:
-            client.index(index=INDEX_NAME, id=postdoc.post_id, body=postdoc.model_dump(mode="json"))
-        skipped = len(postdocs) - len(new_postdocs)
-        logger.info(
-            f"Stored {len(new_postdocs)} new postdocs in Elasticsearch ({skipped} already present)."
-        )
+            create_index(self.elasticsearch_client)
+            for postdoc in postdocs:
+                self.elasticsearch_client.index(
+                    index=INDEX_NAME, id=postdoc.post_id, body=postdoc.model_dump(mode="json")
+                )
+            logger.info(f"Stored {len(postdocs)} postdocs in Elasticsearch.")
+        else:
+            logger.info("Elasticsearch not available — skipping Elasticsearch storage.")
 
     def save_processed_posts(self, postdocs: list[PostDocument]) -> None:
-        """Write processed posts to output_filepath, keyed by post_id.
-
-        Merges with any existing file, skipping post IDs already present.
-        """
+        """Write processed posts to output_filepath, keyed by post_id."""
         self.output_filepath.parent.mkdir(exist_ok=True)
-        existing: dict = {}
-        if self.output_filepath.exists():
-            with open(self.output_filepath) as f:
-                existing = json.load(f)
-        new_docs = {
-            postdoc.post_id: postdoc.model_dump(mode="json")
-            for postdoc in postdocs
-            if postdoc.post_id not in existing
-        }
-        existing.update(new_docs)
+        docs = {postdoc.post_id: postdoc.model_dump(mode="json") for postdoc in postdocs}
         with open(self.output_filepath, "w") as f:
-            json.dump(existing, f)
-        logger.info(
-            f"Saved {self.output_filepath.name}"
-            f" ({len(existing)} postdocs total, {len(new_docs)} new)."
-        )
+            json.dump(docs, f)
+        logger.info(f"Saved {self.output_filepath.name} ({len(docs)} postdocs).")
 
     def run(self) -> None:
         """Run the full preprocessing pipeline: load → caption → embed → store."""
@@ -208,12 +214,9 @@ class PreprocessingPipeline:
         postdocs = self.caption_images(postdocs)
         postdocs = self.generate_embeddings(postdocs)
 
-        if self.elasticsearch_client:
-            logger.info("Elasticsearch available — saving postdocs.")
-            self.save_to_elasticsearch(postdocs)
-        else:
-            logger.info("Elasticsearch not available — using disk only.")
-
+        # Store results: clear existing outputs, then save to Elasticsearch and disk.
+        self.clear_stored_outputs()
+        self.save_to_elasticsearch(postdocs)
         self.save_processed_posts(postdocs)
         logger.info("Preprocessing complete. Run: uv run python -m src.topic_model")
 
