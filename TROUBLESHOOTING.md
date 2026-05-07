@@ -150,3 +150,32 @@ docker compose up -d elasticsearch
 # Make sure your native Ollama has the model the workshop expects:
 ollama list | grep qwen2.5:3b || ollama pull qwen2.5:3b
 ```
+
+## Preprocessing 
+
+## `elasticsearch.BadRequestError 
+
+Error: 
+
+```
+PostDocMissingEmbeddingError
+``` 
+
+or a BadRequestError such as this: 
+```
+elasticsearch.BadRequestError: BadRequestError(400, 'document_parsing_exception', "[1:403] failed to parse: The [dense_vector] field [doc_embedding] in doc [document with id '1c9e469e-b3c6-4f2d-bc23-eea9edf596bf'] has a different number of dimensions [0] thn defined in the mapping [384]"... 
+```
+
+If you see an error message like this when running 
+uv run -m src.preprocessing, it likely means that either you have not completed
+the exercise to build the PreProcessingPipeline.generate_embedding() method or
+there is a coding error in your message such that embeddings were not generated. 
+You may also want to check that you are storing PostDocuments as json.
+BadRequest error can indicate a field mapping error. 
+
+## Pytest 
+
+The ResourceTracker warning at the end is a known Python 3.12 bug in the 
+multiprocess package — unrelated to the code.
+
+
