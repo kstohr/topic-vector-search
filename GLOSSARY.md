@@ -46,7 +46,12 @@ common *inside* a topic but rare *outside* it — i.e. words that distinguish th
 topic from the others.
 
 **Centroid** — The geometric centre (mean) of a set of vectors as projected onto
-a multi-dimensional space. In BERTopic, the *topic embedding* is the centroid of the document embeddings assigned to that topic.
+a multi-dimensional space. In BERTopic, the *topic embedding* is the centroid of
+the document embeddings assigned to that topic. While it is referred to as the
+"centroid" it is important to remember that it is an unweighted representation
+of all terms in all documents assigned to the topic as opposed to a "localized"
+embedding which is generated from the top-n terms and documents most similar to 
+the topic embedding.
 
 **Class document** — In c-TF-IDF, all documents of one class (topic) concatenated
 into a single string before vectorizing. Lets you compute "TF-IDF per class".
@@ -121,13 +126,13 @@ encoder, so image-only posts become searchable by text query.
 **Index (Elasticsearch)** — The Elasticsearch equivalent of a database table.
 Posts are stored in the `post_docs` index.
 
-**Intertopic distance** — Pairwise distance between topic embeddings (centroids).
+**Intertopic distance** — Pairwise distance between topic embeddings.
 BERTopic's `visualize_topics()` plots these on a 2-D map; topics far apart are
 well-separated.
 
 **KeyBERT** — A library that ranks candidate n-grams in a document by cosine
 similarity to the *document's* embedding. BERTopic uses a "KeyBERT-Inspired"
-representation to pick the top n-grams per topic that best match the topic centroid.
+representation to pick the top n-grams per topic that best match the topic embedding.
 
 **KNN (k-nearest neighbours)** — Given a query point, return the *K* points in your
 dataset closest to it under some distance metric. Semantic search is KNN over
@@ -151,10 +156,9 @@ token-by-token (GPT-4, Llama, Qwen). In this workshop, an LLM (Ollama or OpenAI)
 used only to write a one-line topic *label* given the top keywords. Different job
 from the embedding model.
 
-**Localized embedding** — A topic embedding built from the *top KeyBERT keywords*
-rather than from the centroid of document embeddings. Useful when the centroid has
+**Localized embedding** — An embedding built from the *top KeyBERT keywords*
+rather than from the topic embedding. Useful when the topic has
 drifted toward the middle of the embedding space because of diffuse documents.
-Notebook 5 covers this.
 
 **Mean pooling** — How a sentence transformer collapses a variable-length sequence
 of token vectors into a single fixed-size vector: take the per-token hidden vectors,
