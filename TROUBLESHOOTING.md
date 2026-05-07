@@ -178,4 +178,28 @@ BadRequest error can indicate a field mapping error.
 The ResourceTracker warning at the end is a known Python 3.12 bug in the 
 multiprocess package — unrelated to the code.
 
+## Reset Workspace - ("nuclear option")
+
+If all else fails... Try this. 
+
+Remove generated artifacts and clear Elasticsearch data before re-running the workshop pipeline:
+
+```bash
+uv run python reset.py
+```
+
+This works on macOS, Linux, and Windows and will:
+
+- Remove generated files from `output/` (JSON/CSV/HTML + `output/bertopic_model/`)
+- Delete the Elasticsearch index (if Elasticsearch is reachable) and any
+  documents stored on it. 
+
+If you also want to discard uncommitted `.py` edits, use:
+
+```bash
+uv run python reset.py --restore-py
+```
+
+You will see a confirmation prompt before files are restored.
+
 
