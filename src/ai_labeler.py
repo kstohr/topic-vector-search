@@ -11,8 +11,8 @@ default (less human-friendly but still informative).
 import logging
 import os
 
-from bertopic.representation import OpenAI as BertTopicOpenAI
 import httpx
+from bertopic.representation import OpenAI as BertTopicOpenAI
 from openai import OpenAI
 
 from src.config import (
