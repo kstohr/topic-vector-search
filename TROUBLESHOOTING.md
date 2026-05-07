@@ -153,6 +153,20 @@ ollama list | grep qwen2.5:3b || ollama pull qwen2.5:3b
 
 ## Preprocessing 
 
+## HuggingFace model loading issues. 
+
+This workshop uses pytorch for model serialization and loading. 
+
+If someone's HuggingFace cache has a model stored as safetensors but the code 
+expects pytorch (or vice versa), it can cause load errors.
+
+If you have installed one of the models we are using previously and are
+experiencing errors, you may need to remove cached pre-trained models: 
+
+```
+rm -rf ~/.cache/huggingface/hub/models--Salesforce--blip-image-captioning-base
+```
+
 ## `elasticsearch.BadRequestError 
 
 Error: 

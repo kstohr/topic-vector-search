@@ -66,17 +66,13 @@ uv run streamlit run app.py
 
 ### 5. Shutdown the demo app and docker containers 
 ```bash
+
+# Control-C in the running terminal, or in a different terminal: 
 pkill -f "streamlit run app.py 
 docker compose down 
 -- make any changes necessary -- 
 uv sync 
 uv run streamlit run app.py (the app preloads sample posts on startup)
-```
-
-If model versions are an issue, you may need to remove cached pre-trained models: 
-
-```
-rm -rf ~/.cache/huggingface/hub/models--Salesforce--blip-image-captioning-base
 ```
 ---
 
@@ -115,13 +111,12 @@ OLLAMA_MODEL=llama3.2:3b uv run python src/topic_model.py
 ## Explanatory notebooks and Code Exercises
 
 
-
 As the demo progresses you will update specific functions ("Exercises") in the
 `/src` code based on concepts explained in the notebooks created for the workshop.
 The `/src` code powers a simple Streamlit demo app. As you progress through the
-workshop you will add functionality and evaluation tooling to the demo app. The intent is that this will be a no code/low code workshop
-where we focus on learning the key concepts behind embeddings (dense vectors),
-topic modeling and search.  
+workshop you will add functionality and evaluation tooling to the demo app. The 
+intent is that this will be a no code/low code workshop where we focus on
+learning the key concepts behind embeddings (dense vectors),topic modeling and search.  
 
 The final demo `/src` code is stored in `solutions/` for reference or if you run
 out of time on any given exercise. 
@@ -154,11 +149,12 @@ in the terminal after running `uv run python -m src.topic_model`. It is a
 
 ---
 
-
 # References and Credits
 
-Thanks to Maarten Grootendorst for [BERTopic](https://github.com/MaartenGr/BERTopic) and
-to [Ray 'Urgent' McLendon](https://www.linkedin.com/in/raymclendon/) for his interest and input.
+Thanks to Maarten Grootendorst for [BERTopic](https://github.com/MaartenGr/BERTopic), 
+to [Ray 'Urgent' McLendon](https://www.linkedin.com/in/raymclendon/) for his
+interest and input and [Chris Brousseau](https://www.linkedin.com/in/chrisbrousseau/) for making sure this
+repo actually runs and the content is ... on-topic. 
 
 - [Text Search vs Vector Search](https://towardsdatascience.com/text-search-vs-vector-search-better-together-3bd48eb6132a)
 - [Elasticsearch Vector Search](https://www.elastic.co/guide/en/elasticsearch/reference/current/dense-vector.html)
