@@ -20,13 +20,14 @@ import json
 import logging
 from pathlib import Path
 
-from elasticsearch import Elasticsearch
+from elasticsearch import BadRequestError, Elasticsearch
 from PIL import Image
 from sentence_transformers import SentenceTransformer
 from transformers import BlipForConditionalGeneration, BlipProcessor
 
 from src.config import (
     ELASTICSEARCH_URL,
+    EMBEDDING_DIMENSION,
     EMBEDDING_MODEL_NAME,
     OUTPUT,
     REPO,
@@ -39,6 +40,12 @@ logger = logging.getLogger(__name__)
 
 INPUT_FILEPATH = REPO / "sample_posts.json"
 OUTPUT_FILEPATH = OUTPUT / "processed_posts.json"
+
+
+class PostDocMissingEmbeddingError(Exception):
+    """Raised when a PostDocument doc_embedding field is empty"""
+
+    pass
 
 
 def extract_embedding_text(postdoc: PostDocument) -> str:
@@ -140,7 +147,8 @@ class PreprocessingPipeline:
         # Use self._vision_model.generate() to produce caption token IDs
         # Decode the token IDs back to a string with self._vision_processor.decode()
         # Store the result: postdoc.image_caption = caption
-        # You can run `uv run pytest -k TestCaptionSinglePost` to test your implementation.
+        # You can run `uv run pytest -k TestCaptionSinglePost` to test your
+        # implementation.
 
     def caption_images(self, postdocs: list[PostDocument]) -> list[PostDocument]:
         """Caption image-only posts"""
@@ -171,6 +179,16 @@ class PreprocessingPipeline:
         # You can run `uv run pytest -k TestGenerateEmbeddings`
         # to test your implementation.
 
+        if not all(postdoc.doc_embedding is not None for postdoc in postdocs):
+            logger.warning("No embeddings generated — check your implementation.")
+
+        if not all(
+            postdoc.doc_embedding is not None and len(postdoc.doc_embedding) == EMBEDDING_DIMENSION
+            for postdoc in postdocs
+        ):
+            logger.warning(
+                "Embedding dimension mismatch — check your implementation. Did you convert the np.array output of the embedding model to a list?"
+            )
         return postdocs
 
     def clear_stored_outputs(self) -> None:
@@ -188,17 +206,31 @@ class PreprocessingPipeline:
     def save_to_elasticsearch(self, postdocs: list[PostDocument]) -> None:
         """Index postdocs into Elasticsearch."""
 
-        if self.elasticsearch_client:
-            logger.info("Elasticsearch available — saving postdocs.")
+        try:
+            if self.elasticsearch_client:
+                logger.info("Elasticsearch available — saving postdocs.")
 
-            create_index(self.elasticsearch_client)
-            for postdoc in postdocs:
-                self.elasticsearch_client.index(
-                    index=INDEX_NAME, id=postdoc.post_id, body=postdoc.model_dump(mode="json")
+                create_index(self.elasticsearch_client)
+                for postdoc in postdocs:
+                    self.elasticsearch_client.index(
+                        index=INDEX_NAME, id=postdoc.post_id, body=postdoc.model_dump(mode="json")
+                    )
+                logger.info(f"Stored {len(postdocs)} postdocs in Elasticsearch.")
+            else:
+                logger.info("Elasticsearch not available — skipping Elasticsearch storage.")
+        except BadRequestError as error:
+            if "dimension" in str(error).lower():
+                logger.error(
+                    f"Postdoc missing doc_embedding or had invalid dimensions. "
+                    f"Did you complete the embedding exercise? {error}"
                 )
-            logger.info(f"Stored {len(postdocs)} postdocs in Elasticsearch.")
-        else:
-            logger.info("Elasticsearch not available — skipping Elasticsearch storage.")
+                raise PostDocMissingEmbeddingError(
+                    "One or more PostDocuments were missing doc_embedding vectors. "
+                    "Check your generate_embeddings() implementation."
+                ) from error
+            else:
+                logger.error(f"BadRequestError when saving to Elasticsearch: {error}")
+                raise
 
     def save_processed_posts(self, postdocs: list[PostDocument]) -> None:
         """Write processed posts to output_filepath, keyed by post_id."""
