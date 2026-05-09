@@ -110,7 +110,12 @@ class PreprocessingPipeline:
             client = Elasticsearch(ELASTICSEARCH_URL)
             client.info()
             return client
-        except Exception:
+        except Exception as e:
+            logger.info(
+                f"Elasticsearch at {ELASTICSEARCH_URL} unavailable "
+                f"({type(e).__name__}: {e}) — will save to JSON only. "
+                f"Start the stack with: docker compose up -d"
+            )
             return None
 
     def load_postdocs(self) -> list[PostDocument]:
