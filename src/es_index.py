@@ -37,7 +37,7 @@ INDEX_BODY = {
 
 def get_es_client() -> Elasticsearch:
     """Return a new Elasticsearch client using the configured URL."""
-    return Elasticsearch(ELASTICSEARCH_URL)
+    return Elasticsearch(ELASTICSEARCH_URL, request_timeout=30)
 
 
 def create_index(client: Elasticsearch) -> None:

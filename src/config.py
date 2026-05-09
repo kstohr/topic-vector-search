@@ -20,9 +20,9 @@ EMBEDDING_DIMENSION = 384
 VISION_MODEL_NAME = "Salesforce/blip-image-captioning-base"
 
 # LLM for topic labeling
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/v1")
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434/v1")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:3b")
 OPENAI_MODEL = "gpt-4o-mini"
 
 # Search backend (matches docker-compose host mapping)
-ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL", "http://localhost:9201")
+ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL", "http://127.0.0.1:9201")
