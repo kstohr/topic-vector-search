@@ -49,6 +49,9 @@ will have at the workshop start. You'll be glad you did.
  - [x] Send Chris windows tickets 
        - https://github.com/kstohr/topic-vector-search/issues/10
        - https://github.com/kstohr/topic-vector-search/issues/11
+ - [x] Merge PR #12: Windows IPv6 fix (localhost → 127.0.0.1, improved error messaging)
+ - [x] Merge notebook tzinfo fix (datetime.now(UTC) syntax correction)
+ - [x] Merge enhanced exercise instructions for notebooks 02 & 04 (external PR)
  - [x] Clean Code review: PROGRESS
         - [ ] Create classes
 	      - [ ] Review modules for and ensure raise errors clearly and quickly. Error messages should guide attendees on how to fix the problem ("Run preprocessing.py and try again.") or ("Check the paramters passed to BERTopic model.")
@@ -57,24 +60,24 @@ will have at the workshop start. You'll be glad you did.
 	      - [ ] Check for repeated code lines. Is there an existing method we can use instead?
 
  - [ ] Review comments for stupid AI stuff PROGRESS
- - [ ] Update explainer notebooks PROGRESS
-       - [ ] Add pre-run checks at top of notebooks 
+ - [x] Update explainer notebooks PROGRESS
+       - [x] Add pre-run checks at top of notebooks 
        - [ ] Add outline to 01_lexical_vs_sematnic.py, check outline matches
        markdown (all notebooks)
        - [ ] Add parameter comments to 03_topic_modeling.py
        - [ ] Move postdoc model from code into notebook_02 with structured docs; so
        users are not updating the original methods. 
-       - [ ] Clarify, simplify exercise prompts in notebooks
-          - [ ] Add instructions to run pytest for methods in exercises
+       - [x] Clarify, simplify exercise prompts in notebooks
+          - [x] Add instructions to run pytest for methods in exercises
        - [ ] notebook_03:  need HDDBSCAN image for Step 2 to make concept of balancing
   good matches with clusters make sense...
   (generate_embedding(), success metrics, vision)
   that when user changes code they don't mess with source pipeline
- - [ ] Create GLOSSARY.MD PROGRESS
-        - check links
- - [ ] Create FAQ.md PROGRESS
-        - check links
- - [ ] Create Troubleshooting.md PROGRESS
+ - [x] Create GLOSSARY.MD PROGRESS
+        - [x] check links
+ - [x] Create FAQ.md PROGRESS
+        - [x] check links
+ - [x] Create Troubleshooting.md PROGRESS
  - [ ] Update run of show
  - [ ] Update README.md 
         - [ ] Add restart/
