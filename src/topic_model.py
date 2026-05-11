@@ -99,8 +99,12 @@ class TopicModeler:
             client.info()
             logger.info("Elasticsearch connection established.")
             return client
-        except Exception:
-            logger.info("Elasticsearch not available — will use processed_posts.json fallback.")
+        except Exception as e:
+            logger.info(
+                f"Elasticsearch at {ELASTICSEARCH_URL} unavailable "
+                f"({type(e).__name__}: {e}) — using processed_posts.json fallback. "
+                f"Start the stack with: docker compose up -d"
+            )
             return None
 
     # ── Data retrieval ─────────────────────────────────────────────────────

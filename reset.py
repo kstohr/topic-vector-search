@@ -14,7 +14,9 @@ import logging
 import shutil
 import subprocess
 
-from src.config import OUTPUT
+from elasticsearch import ConnectionError as ESConnectionError, ConnectionTimeout
+
+from src.config import ELASTICSEARCH_URL, OUTPUT
 from src.es_index import delete_index, get_es_client
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
@@ -32,8 +34,21 @@ def reset_elasticsearch() -> None:
         client = get_es_client()
         client.info()
         delete_index(client)
-    except Exception:
-        logger.warning("Elasticsearch not reachable — skipping index deletion.")
+    except ESConnectionError as e:
+        logger.warning(
+            f"Cannot reach Elasticsearch at {ELASTICSEARCH_URL}: {e}.\n"
+            f"  Is Docker running? Start the stack with:  docker compose up -d\n"
+            f"  Check container status with:               docker ps"
+        )
+    except ConnectionTimeout as e:
+        logger.warning(
+            f"Elasticsearch at {ELASTICSEARCH_URL} timed out: {e}. "
+            f"The container may still be starting — retry in a few seconds."
+        )
+    except Exception as e:
+        logger.warning(
+            f"Elasticsearch index deletion skipped — {type(e).__name__}: {e}"
+        )
 
 
 def reset_output() -> None:
