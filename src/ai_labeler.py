@@ -32,23 +32,53 @@ def build_llm_representation(prompt: str) -> BertTopicOpenAI | None:
       3. None → KeyBERT-only labels
     """
 
+    # Check if Ollama is available and has the configured model.
     try:
         resp = httpx.get(OLLAMA_URL.replace("/v1", "/api/tags"), timeout=2)
         if resp.status_code == 200:
-            logger.info(f"Ollama reachable at {OLLAMA_URL} — using {OLLAMA_MODEL}")
-            client = OpenAI(base_url=OLLAMA_URL, api_key="ollama")
-            return BertTopicOpenAI(
-                client=client,
-                model=OLLAMA_MODEL,
-                exponential_backoff=True,
-                chat=True,
-                prompt=prompt,
-                nr_docs=5,
-            )
-    except Exception:
-        pass
+            payload = resp.json() if resp.content else {}
+            models = payload.get("models", []) if isinstance(payload, dict) else []
+            available_models = {
+                str(item.get("name", "")).strip()
+                for item in models
+                if isinstance(item, dict) and item.get("name")
+            }
+            if OLLAMA_MODEL in available_models:
+                logger.info(f"Ollama reachable at {OLLAMA_URL} — using {OLLAMA_MODEL}")
+                client = OpenAI(base_url=OLLAMA_URL, api_key="ollama")
+                return BertTopicOpenAI(
+                    client=client,
+                    model=OLLAMA_MODEL,
+                    exponential_backoff=True,
+                    chat=True,
+                    prompt=prompt,
+                    nr_docs=5,
+                )
 
+            logger.warning(
+                "Ollama reachable but configured model '%s' is not available. "
+                "Falling back to OpenAI API key or KeyBERT-only labels.",
+                OLLAMA_MODEL,
+            )
+
+        # If Ollama is reachable but returns an error, log it and fall back to other options.
+        else:
+            logger.warning(
+                "Ollama /api/tags returned HTTP %s. "
+                "Falling back to OpenAI API key or KeyBERT-only labels.",
+                resp.status_code,
+            )
+    except Exception as error:
+        logger.warning(
+            "Could not query Ollama model tags (%s). "
+            "Falling back to OpenAI API key or KeyBERT-only labels.",
+            error,
+        )
+
+    # Check for OpenAI API key and use if available.
     api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        logger.warning("No OpenAI API key found in environment variable OPENAI_API_KEY. ")
     if api_key:
         logger.info("Using OpenAI API for topic labels.")
         client = OpenAI(

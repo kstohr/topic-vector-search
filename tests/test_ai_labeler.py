@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from unittest.mock import MagicMock, patch
 
 from src.ai_labeler import build_llm_representation
@@ -13,7 +14,13 @@ class TestBuildLlmRepresentation:
     def test_prefers_ollama_when_available(
         self, mock_openai_client, mock_httpx_get, mock_bt_openai, monkeypatch
     ) -> None:
-        mock_httpx_get.return_value.status_code = 200
+        # Mock the /api/tags response to include the configured model
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"models": [{"name": OLLAMA_MODEL}]}
+        mock_response.content = b"{}"
+        mock_httpx_get.return_value = mock_response
+
         mock_bt_openai.return_value = MagicMock(name="ollama_model")
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
 
@@ -52,3 +59,54 @@ class TestBuildLlmRepresentation:
         result = build_llm_representation(prompt="label this topic")
 
         assert result is None
+
+    @patch("httpx.get")
+    def test_warns_when_ollama_model_missing(self, mock_httpx_get, caplog) -> None:
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.content = b"{}"
+        mock_response.json.return_value = {"models": [{"name": "some-other-model"}]}
+        mock_httpx_get.return_value = mock_response
+
+        with caplog.at_level(logging.WARNING, logger="src.ai_labeler"):
+            _ = build_llm_representation(prompt="label this topic")
+
+        assert any(
+            "configured model" in record.message and "not available" in record.message
+            for record in caplog.records
+        )
+
+    @patch("httpx.get")
+    def test_warns_when_ollama_tags_non_200(self, mock_httpx_get, caplog) -> None:
+        mock_response = MagicMock()
+        mock_response.status_code = 503
+        mock_response.content = b""
+        mock_httpx_get.return_value = mock_response
+
+        with caplog.at_level(logging.WARNING, logger="src.ai_labeler"):
+            _ = build_llm_representation(prompt="label this topic")
+
+        assert any("/api/tags returned HTTP 503" in record.message for record in caplog.records)
+
+    @patch("httpx.get")
+    def test_warns_when_ollama_tags_query_fails(self, mock_httpx_get, caplog) -> None:
+        mock_httpx_get.side_effect = Exception("network unreachable")
+
+        with caplog.at_level(logging.WARNING, logger="src.ai_labeler"):
+            _ = build_llm_representation(prompt="label this topic")
+
+        assert any(
+            "Could not query Ollama model tags" in record.message for record in caplog.records
+        )
+
+    @patch("httpx.get")
+    def test_warns_when_no_openai_key_and_no_llm(self, mock_httpx_get, monkeypatch, caplog) -> None:
+        mock_httpx_get.side_effect = Exception("ollama down")
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+        with caplog.at_level(logging.WARNING, logger="src.ai_labeler"):
+            result = build_llm_representation(prompt="label this topic")
+
+        assert result is None
+        assert any("No OpenAI API key found" in record.message for record in caplog.records)
+        assert any("No LLM available" in record.message for record in caplog.records)
