@@ -1,23 +1,23 @@
 # Glossary
 
-Terms used throughout the workshop. Aimed at a software developer who hasn't done
-much NLP / IR / ML work before. Listed alphabetically.
+Terms used throughout the workshop.
 
 ---
 
-**all-MiniLM-L6-v2** — The 22M-parameter sentence-transformer used everywhere in this
-workshop. Takes any string and returns a 384-dimensional embedding. Small, fast, and
-runs comfortably on CPU. See *Sentence transformer*.
+**all-MiniLM-L6-v2** — A popular, lightweight 22M-parameter sentence-transformer
+embedding model used throughout this workshop. Takes any string and returns a
+384-dimensional embedding. Small, fast, and runs comfortably on CPU. See
+*Sentence transformer*.
 
-**Attention** — The mechanism in a transformer that lets each token "look at" the
+**Attention** — The mechanism in a transformer-based model that lets each token "look at" the
 other tokens in the input and update its own vector based on what's relevant. The
 reason transformers can produce *contextual* embeddings (the word *bank* near
 *river* ends up at a different point in the embedding space than *bank* near *loan*).
 
-**Baseline (random) precision** — The precision you'd expect from picking results
-uniformly at random. For a topic of size *t* in a corpus of size *N*, it's just
+**Baseline (random) precision** — The precision you'd expect from picking search
+results uniformly at random. For a topic of size *t* in a corpus of size *N*, it's just
 `t / N`. Used as a sanity check: if your search precision isn't well above random,
-the search isn't doing much.
+the search isn't performing well.
 
 **BERT** — *Bidirectional Encoder Representations from Transformers*. A 2018
 transformer-encoder model from Google. The "B" in BERTopic and KeyBERT refers to
@@ -31,13 +31,13 @@ pipeline: `embed → UMAP (reduce dims) → HDBSCAN (cluster) → CountVectorize
 used in Notebook 6 to generate text captions for image-only posts so they can be
 embedded by the same text encoder.
 
-**BM25** — BM25 (Best Matching 25) is a ranking algorithm used in search. 
- It is the default ranking function in Lucene and Elasticsearch. 
-Scores documents by how often the query terms appear, dampened for very
-common terms and adjusted for document length (See: Term Frequency × Inverse 
-Document Frequency). Token-based — it cannot bridge synonyms. However,
-Elsaticsearch and other search engines do allow additional synonym handling, 
-BM25 does not handle synonyms by default.
+**BM25** — BM25 (Best Matching 25) is a ranking algorithm used in search. It is 
+the default ranking function in Lucene and Elasticsearch. Scores documents by 
+how often the query terms appear, dampened for very common terms and adjusted
+for document length (See: Term Frequency × Inverse Document Frequency).
+Token-based — it cannot bridge synonyms. However, Elsaticsearch and other search
+engines do allow additional synonym handling, BM25 does not handle synonyms by
+default.
 
 **c-TF-IDF (class-based TF-IDF)** — A BERTopic variant of TF-IDF (Term Frequency
  × Inverse Document Frequency) where each *cluster*
@@ -67,8 +67,10 @@ the `sample_posts.json` (and its noisy variant) is the corpus.
 
 **Cosine similarity** — A similarity score between two vectors, computed as
 `dot(a, b) / (|a| * |b|)`. Range `-1` (opposite) → `0` (orthogonal) → `1`
-(same direction). Insensitive to vector *magnitude* — it only measures *direction*,
-which is exactly what you want for embeddings.
+(same direction). Insensitive to vector *magnitude* — it only measures
+*direction*. The size of the angle between two vectors as measured from a point
+of origin, determines how similar two vectors are in a multidimensional
+embedding space.
 
 **CountVectorizer** — A scikit-learn class that turns a list of strings into a
 sparse matrix of n-gram counts. Used by BERTopic to build the per-topic vocabulary
@@ -93,11 +95,12 @@ diversity = the heatmap shows low cosine similarity off the diagonal.
 
 **Elasticsearch** — The search engine used by the demo app. Stores documents,
 supports BM25 keyword search, and supports vector similarity search via `script_score`
-queries. The repo also ships an in-memory fallback if Docker isn't running.
+queries. The repo also includes an in-memory version of search using cosine
+similarity. 
 
 **Embedding** — The output of an embedding model: a dense vector representing the
 meaning of a piece of text (or image, audio, etc.). Two semantically similar inputs
-end up at nearby points.
+will be positioned at nearby points.
 
 **Embedding space** — The high-dimensional coordinate system the embeddings live in
 (384-d for `all-MiniLM-L6-v2`). "Similar inputs cluster together in the embedding
@@ -117,7 +120,8 @@ which we measure topic-embedding *search* quality.
 **HDBSCAN** — *Hierarchical Density-Based Spatial Clustering of Applications with
 Noise*. A clustering algorithm that finds dense regions of points and labels
 everything else as outliers (label `-1`). Unlike k-means, you don't tell it how
-many clusters to find.
+many clusters to find. It optimizes the number of clusters as it trains. You can
+however, set the minimum number of clusters as a parameter.
 
 **Image captioning** — Generating a text description of an image with a
 vision-language model (BLIP here). The caption is then embedded with the same text
@@ -193,11 +197,12 @@ cluster. Not "bad" data — just not part of any dense region. They still appear
 search results, which is part of the noise problem in Notebook 5.
 
 **Pre-trained model** — A model whose weights have already been trained on a large
-corpus and shipped for reuse. The whole workshop assumes you don't train an
+corpus and shipped for reuse. In this workshop, you don't train an
 embedding model from scratch — you download `all-MiniLM-L6-v2` and use its weights.
 
 **Precision@K** — Of the top-*K* search results, how many are *relevant*? `hits / K`.
-Tracks the *first-impression* quality of search.
+Tracks the *first-impression* quality of search. K is usually set to the number
+of results a user would see before pagination or scrolling.
 
 **Probability (BERTopic)** — Per-document, per-topic membership confidence (a number
 in [0, 1]) computed by HDBSCAN's soft-clustering mode. Stored in
@@ -250,7 +255,7 @@ documents).
 word *kitten* might be one token, *kittenish* might be split into `kitten` + `##ish`.
 
 **Tokenization** — The step of splitting raw text into tokens. The first thing any
-NLP model does to your input.
+Natural Language Processing (NLP) model does to your input.
 
 **top_k** — How many results to return from a search. The "K" in KNN, precision@K,
 recall@K — but these aren't the same K (see *eval-K*).
