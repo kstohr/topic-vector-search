@@ -3,10 +3,8 @@ TODO:
  - [ ] Contact participants about setup 
 Hello!
 
-Excited to present the workshop Thinking of Topic Modeling as Search at the
-upcoming Pycon Conference in Long Beach. I am still preparing the materials,
-but wanted to reach out and encourage you to take a look at the repo and
-install the workshop requirements.
+Excited to present the workshop Thinking of Topic Modeling as Search tomorrow.
+Please take a moment today to download the workshop requirements. 
  
 1. Go to https://github.com/kstohr/topic-vector-search
 2. Follow the "Installation" instructions on the [README.md](https://github.com/kstohr/topic-vector-search/blob/main/README.md)
@@ -40,22 +38,15 @@ Chris Brousseau, chris@surfaceowl.com
 
 P.S. 
 
-Seriously... download and install these packages! If you are like me, you are
-tempted to ignore this email. This is a lot to install in the few minutes we
-will have at the workshop start. You'll be glad you did. 
+See you tomorrow! 
   
- - [ ] Check if Pamela Fox is free to TA with Chris PROGRESS
  - [x ] Follow up with Paul about TA'ing
- - [x] Send Chris windows tickets 
-       - https://github.com/kstohr/topic-vector-search/issues/10
-       - https://github.com/kstohr/topic-vector-search/issues/11
  - [x] Clean Code review: PROGRESS
         - [ ] Create classes
 	      - [ ] Review modules for and ensure raise errors clearly and quickly. Error messages should guide attendees on how to fix the problem ("Run preprocessing.py and try again.") or ("Check the paramters passed to BERTopic model.")
 	      - [ ] Ensure every module has logging
 	      - [ ] Ok in preprocessing.py and related tests. We often refer to a PostDocument object as a "post" this is confusing. We should always refer to a Post object as "post" and a PostDocument object as a "postdoc" PROGRESS
 	      - [ ] Check for repeated code lines. Is there an existing method we can use instead?
-
  - [ ] Review comments for stupid AI stuff PROGRESS
  - [ ] Update explainer notebooks PROGRESS
        - [ ] Add pre-run checks at top of notebooks 
