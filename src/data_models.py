@@ -6,10 +6,9 @@ Pydantic models for raw posts (Post) and processed post documents
 (PostDocument).
 """
 
-import re
 from datetime import UTC, datetime
 
-import emoji
+import emoji  # noqa: F401 - exercise placeholder
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 

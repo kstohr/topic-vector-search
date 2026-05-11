@@ -6,7 +6,6 @@ Pydantic models for raw posts (Post) and processed post documents
 (PostDocument).
 """
 
-import re
 from datetime import UTC, datetime
 
 import emoji
@@ -69,7 +68,6 @@ class PostDocument(Post):
         if text is None:
             text = self.post_text
         text = emoji.demojize(text).replace("_", " ")
-        text = re.sub(r"\s+", " ", text).strip()
         return text.strip()
 
     ##############################
