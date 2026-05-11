@@ -34,14 +34,15 @@ from src.evaluation import (
 )
 from src.search import (
     _SEARCHER_LABELS,
-    MissingEmbeddingsError,
     TEXT_SEARCH_ENGINES,
     TOP_K_DEFAULT,
     TOPIC_SEARCH_ENGINES,
+    EmptySearchIndexError,
+    MissingEmbeddingsError,
+    NoSearchIndexFound,
     TextSearchArgs,
     TopicSearchArgs,
     get_searcher,
-    get_searcher_label,
     get_topic_searcher,
     run_search_by_text,
     run_search_by_topic,
@@ -50,6 +51,12 @@ from src.topic_ranking import TopicRankingArgs, TrendingTopic, rank_topics
 
 OUTPUT = Path(__file__).parent / "output"
 REPO = Path(__file__).parent
+SEARCH_ERRORS = (EmptySearchIndexError, NoSearchIndexFound, MissingEmbeddingsError)
+
+
+def _format_search_error(error: Exception) -> str:
+    return f"{type(error).__name__}: {error}"
+
 
 st.set_page_config(page_title="Topic Vector Search", layout="wide")
 
@@ -187,6 +194,13 @@ def load_doc_index() -> list[dict]:
         with open(path, encoding="utf-8") as f:
             return list(json.load(f).values())
     return load_raw_posts()
+
+
+# After cache clear, proactively warm post-related caches on the next rerun.
+if st.session_state.pop("_reload_posts_on_rerun", False):
+    _startup_index_posts()
+    load_doc_index()
+    load_posts_by_id()
 
 
 # Displayed in evaluation view; not used by search functions themselves.
@@ -486,6 +500,7 @@ with st.sidebar:
     if st.button("Clear cache", width="stretch"):
         st.cache_data.clear()
         st.cache_resource.clear()
+        st.session_state._reload_posts_on_rerun = True
         st.rerun()
 
     st.header("Search Controls")
@@ -581,18 +596,22 @@ for col, topic in zip(cols, trending, strict=False):
             st.rerun()
 
 if st.session_state.show_topic_eval:
+    labels = load_topic_labels()
+    eval_df = pd.DataFrame()
     with st.spinner("Evaluating topics…"):
-        labels = load_topic_labels()
-        eval_df: pd.DataFrame = evaluate_topics(
-            TopicEvalArgs(
-                corpus_size=len(load_posts_by_id()),
-                labels=labels,
-                assignments=load_assignments(),
-                topic_embeddings=_topic_embeddings(),
-                searcher=build_topic_searcher(topic_engine),
-                keywords=load_topic_keywords(),
+        try:
+            eval_df = evaluate_topics(
+                TopicEvalArgs(
+                    corpus_size=len(load_posts_by_id()),
+                    labels=labels,
+                    assignments=load_assignments(),
+                    topic_embeddings=_topic_embeddings(),
+                    searcher=build_topic_searcher(topic_engine),
+                    keywords=load_topic_keywords(),
+                )
             )
-        )
+        except SEARCH_ERRORS as error:
+            st.error(_format_search_error(error))
 
     topic_ids = sorted(labels.keys())
 
@@ -678,12 +697,12 @@ if st.session_state.show_topic_eval:
         info = labels[active_eval_topic]
         try:
             results = _search_by_topic(active_eval_topic, top_k=DEFAULT_EVAL_K)
-        except MissingEmbeddingsError as error:
-            st.error(str(error))
+        except SEARCH_ERRORS as error:
+            st.error(_format_search_error(error))
             results = []
 
         st.subheader(f"Results for {info['label']}")
-        engine_label = get_searcher_label(build_topic_searcher(topic_engine))
+        engine_label = _SEARCHER_LABELS[topic_engine]
         st.caption(f"Search engine: {engine_label} · Embedding: {_embedding_strategy_label()}")
 
         if st.session_state.eval_view:
@@ -708,24 +727,24 @@ if not st.session_state.show_topic_eval and (
         with st.spinner("Searching…"):
             try:
                 results = _search_by_topic(topic_id, top_k=TOP_K_DEFAULT)
-            except MissingEmbeddingsError as error:
-                st.error(str(error))
+            except SEARCH_ERRORS as error:
+                st.error(_format_search_error(error))
                 results = []
     else:
         header_text = f'Results for "{query}"'
         with st.spinner("Searching…"):
             try:
                 results = _search_by_text(query, top_k=TOP_K_DEFAULT)
-            except MissingEmbeddingsError as error:
-                st.error(str(error))
+            except SEARCH_ERRORS as error:
+                st.error(_format_search_error(error))
                 results = []
 
     st.subheader(header_text)
     if topic_id is not None:
-        engine_label = get_searcher_label(build_topic_searcher(topic_engine))
+        engine_label = _SEARCHER_LABELS[topic_engine]
         st.caption(f"Search engine: {engine_label} · Embedding: {_embedding_strategy_label()}")
     else:
-        st.caption(f"Search engine: {get_searcher_label(build_searcher(text_engine))}")
+        st.caption(f"Search engine: {_SEARCHER_LABELS[text_engine]}")
 
     if st.session_state.eval_view:
         render_results_eval(results)

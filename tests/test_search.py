@@ -8,6 +8,7 @@ from src.search import (
     InMemoryKeywordSearcher,
     InMemorySemanticSearcher,
     MissingEmbeddingsError,
+    NoSearchIndexFound,
     TextSearchArgs,
     TopicSearchArgs,
     get_searcher,
@@ -297,6 +298,25 @@ class TestSemanticSearcher:
             query_embedding = np.array([1.0, 0.0, 0.0])
 
             with pytest.raises(EmptySearchIndexError, match="Index 'empty_index' is empty"):
+                searcher.search_similar_documents(query_embedding)
+
+    def test_no_search_index_found_raised_when_index_not_found(self):
+        """Test that NoSearchIndexFound is raised when the index does not exist."""
+        from elasticsearch import NotFoundError
+
+        with patch("src.search.Elasticsearch") as mock_es_cls:
+            mock_es = MagicMock()
+            mock_es.count.side_effect = NotFoundError(
+                404, "index_not_found_exception", "no such index"
+            )
+            mock_es_cls.return_value = mock_es
+
+            from src.search import SemanticSearcher
+
+            searcher = SemanticSearcher([], index_name="missing_index")
+            query_embedding = np.array([1.0, 0.0, 0.0])
+
+            with pytest.raises(NoSearchIndexFound, match="Index 'missing_index' does not exist"):
                 searcher.search_similar_documents(query_embedding)
 
     def test_bad_request_error_reraised_when_index_has_documents(self, semantic_searcher_es):

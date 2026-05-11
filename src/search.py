@@ -25,6 +25,10 @@ logger = logging.getLogger(__name__)
 TOP_K_DEFAULT = 20
 
 
+class NoSearchIndexFound(Exception):
+    """Raised when the Elasticsearch index does not exist."""
+
+
 class EmptySearchIndexError(Exception):
     """Raised when the Elasticsearch index exists but contains no documents."""
 
@@ -46,14 +50,20 @@ class KeywordSearcher:
         self, query: str, top_k: int = TOP_K_DEFAULT, filters: list[dict] | None = None
     ) -> list[dict]:
         """Run a BM25 match query against post_text and return ranked results."""
+        from elasticsearch import NotFoundError
+
         body = {
             "size": top_k,
             "query": {"match": {"post_text": query}},
         }
         try:
             resp = self.client.search(index=self.index_name, body=body)
-        except Exception as e:
-            raise ConnectionError("Check that the docker container is running") from e
+        except NotFoundError as error:
+            raise NoSearchIndexFound(
+                f"Index '{self.index_name}' does not exist — run src.preprocess to index posts"
+            ) from error
+        except Exception as error:
+            raise ConnectionError("Check that the docker container is running") from error
         results = [
             {
                 "score": hit["_score"],
@@ -136,26 +146,34 @@ class SemanticSearcher:
         - If top_k is set: return top_k docs ranked by cosine similarity.
         - If top_k is None: return all matching docs ranked by cosine similarity.
         """
+        from elasticsearch import NotFoundError
+
         # Check if index has any documents at all
-        total_count = self.client.count(index=self.index_name).get("count", 0)
+        try:
+            total_count = self.client.count(index=self.index_name).get("count", 0)
+        except NotFoundError as e:
+            raise NoSearchIndexFound(
+                f"Index '{self.index_name}' does not exist — run src.preprocess to index posts"
+            ) from e
+
         if total_count == 0:
             raise EmptySearchIndexError(
-                f"Index '{self.index_name}' is empty — run src.preprocess to generate embeddings and index posts"
+                f"Index '{self.index_name}' is empty — "
+                f"run src.preprocess to generate embeddings and index posts"
             )
-        
+
         # Check if doc_embedding field exists in the index before executing script_score
         doc_embedding_count = self.client.count(
-            index=self.index_name,
-            body={"query": {"exists": {"field": "doc_embedding"}}}
+            index=self.index_name, body={"query": {"exists": {"field": "doc_embedding"}}}
         ).get("count", 0)
-        
+
         if doc_embedding_count == 0:
             raise MissingEmbeddingsError(
                 "Semantic Search is not available. "
                 "One or more document embeddings are not stored. "
                 "Have you completed the generate_embeddings coding exercise and run preprocess.py?"
             )
-        
+
         # ES requires size to be an integer; None means "return all up to the ES max"
         size = top_k if top_k is not None else 10_000
 
@@ -174,13 +192,17 @@ class SemanticSearcher:
         }
 
         from elastic_transport import ConnectionError as ESConnectionError
-        from elasticsearch import BadRequestError
+        from elasticsearch import BadRequestError, NotFoundError
 
         try:
             response = self.client.search(index=self.index_name, body=body)
+        except NotFoundError as e:
+            raise NoSearchIndexFound(
+                f"Index '{self.index_name}' does not exist — run src.preprocess to index posts"
+            ) from e
         except ESConnectionError as e:
             raise ConnectionError("Check that the docker container is running") from e
-        except BadRequestError as e:
+        except BadRequestError:
             raise
         hits = response["hits"]["hits"]
         results = [{"score": hit["_score"], **hit["_source"]} for hit in hits]
