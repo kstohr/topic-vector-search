@@ -1,6 +1,49 @@
 TODO: 
 
  - [ ] Contact participants about setup 
+Hello!
+
+Excited to present the workshop Thinking of Topic Modeling as Search at the
+upcoming Pycon Conference in Long Beach. I am still preparing the materials,
+but wanted to reach out and encourage you to take a look at the repo and
+install the workshop requirements.
+ 
+1. Go to https://github.com/kstohr/topic-vector-search
+2. Follow the "Installation" instructions on the [README.md](https://github.com/kstohr/topic-vector-search/blob/main/README.md)
+3. Run the [Setup Notebook](https://github.com/kstohr/topic-vector-search/blob/main/notebooks/00_setup_check.ipynb) - Checks that all systems are go!~ 
+ 
+ **Do this before the workshop** 
+
+- This project involves both search and language models. Installation
+       requires at least ~15GB download and **can be very slow** on conference
+       wifi. Especially on older machines. 
+- To enable the repo to run cross-platform (Mac Intel, Mac Silicon,
+       Windows), we are not running the latest version of python. You may need
+       to install python 3.12. Some packages are also pinned to older versions
+       for compatibility. While we have tried to test it on different operating
+       systems, it is possible you may run into package conflicts. These can
+       take time to resolve. 
+- We have created a troubleshooting guide to help resolve issues you may
+  experience both installing the workshop materials and running code during the
+  workshop
+  [TROUBLESHOOTING.md](https://github.com/kstohr/topic-vector-search/blob/main/TROUBLESHOOTING.md)
+  
+ If you have any issues or questions, email both Chris Brousseau
+ (chris@surfaceowl.com)  and myself. We are happy to help. 
+
+Workshop Presenter: 
+Kas Stohr, kas@99antennas.com
+
+Teaching Assistant: 
+Chris Brousseau, chris@surfaceowl.com
+
+
+P.S. 
+
+Seriously... download and install these packages! If you are like me, you are
+tempted to ignore this email. This is a lot to install in the few minutes we
+will have at the workshop start. You'll be glad you did. 
+  
  - [ ] Check if Pamela Fox is free to TA with Chris PROGRESS
 -  [x] Send Chris windows tickets 
        - https://github.com/kstohr/topic-vector-search/issues/10
@@ -115,5 +158,70 @@ tests/test_ai_labeler.py line 47-- add newline
   good matches with clusters make sense...
 - [X] Handle FileNotFoundError if processed_posts.json not available. Raise specific ProcessedPostsNotFoundError when topic_model.py cannot
   import posts. 
+- [ ] APP error handling: Catch KeyError: 'doc_embedding' on semantic search calls, display message
+  ("Semantic Search is not available. No document embeddings are stored. Have
+  you completed the generate_embeddings coding exercise and run preprocess.py)
 
-
+INFO:sentence_transformers.SentenceTransformer:Load pretrained SentenceTransformer: all-MiniLM-L6-v2
+2026-05-06 22:20:56.997 Uncaught app execution
+Traceback (most recent call last):
+  File "/Users/kas/dev/pycon_2026/topic-vector-search/.venv/lib/python3.12/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 129, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "/Users/kas/dev/pycon_2026/topic-vector-search/.venv/lib/python3.12/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 689, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kas/dev/pycon_2026/topic-vector-search/app.py", line 591, in <module>
+    searcher=build_topic_searcher(topic_engine),
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kas/dev/pycon_2026/topic-vector-search/.venv/lib/python3.12/site-packages/streamlit/runtime/caching/cache_utils.py", line 281, in __call__
+    return self._get_or_create_cached_value(args, kwargs, spinner_message)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kas/dev/pycon_2026/topic-vector-search/.venv/lib/python3.12/site-packages/streamlit/runtime/caching/cache_utils.py", line 326, in _get_or_create_cached_value
+    return self._handle_cache_miss(cache, value_key, func_args, func_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kas/dev/pycon_2026/topic-vector-search/.venv/lib/python3.12/site-packages/streamlit/runtime/caching/cache_utils.py", line 385, in _handle_cache_miss
+    computed_value = self._info.func(*func_args, **func_kwargs)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kas/dev/pycon_2026/topic-vector-search/app.py", line 227, in build_topic_searcher
+    return get_topic_searcher(load_doc_index(), engine)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kas/dev/pycon_2026/topic-vector-search/src/search.py", line 275, in get_topic_searcher
+    return _SEARCHER_CLASSES[engine](posts)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kas/dev/pycon_2026/topic-vector-search/src/search.py", line 196, in __init__
+    embeddings = np.array([p["doc_embedding"] for p in posts], dtype=np.float32)
+                           ~^^^^^^^^^^^^^^^^^
+KeyError: 'doc_embedding'
+INFO:sentence_transformers.SentenceTransformer:Use pytorch device_name: mps
+INFO:sentence_transformers.SentenceTransformer:Load pretrained SentenceTransformer: all-MiniLM-L6-v2
+2026-05-06 22:21:04.266 Uncaught app execution
+Traceback (most recent call last):
+  File "/Users/kas/dev/pycon_2026/topic-vector-search/.venv/lib/python3.12/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 129, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "/Users/kas/dev/pycon_2026/topic-vector-search/.venv/lib/python3.12/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 689, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kas/dev/pycon_2026/topic-vector-search/app.py", line 591, in <module>
+    searcher=build_topic_searcher(topic_engine),
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kas/dev/pycon_2026/topic-vector-search/.venv/lib/python3.12/site-packages/streamlit/runtime/caching/cache_utils.py", line 281, in __call__
+    return self._get_or_create_cached_value(args, kwargs, spinner_message)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kas/dev/pycon_2026/topic-vector-search/.venv/lib/python3.12/site-packages/streamlit/runtime/caching/cache_utils.py", line 326, in _get_or_create_cached_value
+    return self._handle_cache_miss(cache, value_key, func_args, func_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kas/dev/pycon_2026/topic-vector-search/.venv/lib/python3.12/site-packages/streamlit/runtime/caching/cache_utils.py", line 385, in _handle_cache_miss
+    computed_value = self._info.func(*func_args, **func_kwargs)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kas/dev/pycon_2026/topic-vector-search/app.py", line 227, in build_topic_searcher
+    return get_topic_searcher(load_doc_index(), engine)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kas/dev/pycon_2026/topic-vector-search/src/search.py", line 275, in get_topic_searcher
+    return _SEARCHER_CLASSES[engine](posts)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kas/dev/pycon_2026/topic-vector-search/src/search.py", line 196, in __init__
+    embeddings = np.array([p["doc_embedding"] for p in posts], dtype=np.float32)
+                           ~^^^^^^^^^^^^^^^^^
+KeyError: 'doc_embedding'

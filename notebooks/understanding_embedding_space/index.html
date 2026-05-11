@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Embedding Space</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #020617;
+    color: #e5e7eb;
+    height: 100vh;
+    font-family: Arial, Helvetica, sans-serif;
+    overflow: hidden;
+  }
+  .stage {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .slide {
+    max-width: 95vw;
+    max-height: 95vh;
+  }
+  .arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #ffffff;
+    font-size: 64px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 12px 20px;
+    user-select: none;
+    opacity: 0.75;
+    transition: opacity 0.2s;
+  }
+  .arrow:hover { opacity: 1; }
+  .arrow:disabled { opacity: 0.15; cursor: default; }
+  .arrow.left { left: 16px; }
+  .arrow.right { right: 16px; }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <img class="slide" id="slide" alt="">
+  </div>
+  <button class="arrow left" id="prev" aria-label="Previous slide">&#8249;</button>
+  <button class="arrow right" id="next" aria-label="Next slide">&#8250;</button>
+
+  <script>
+    const TOTAL_SLIDES = 10;
+    const BUILDS = 5;
+    const BUILD_INTERVAL_MS = 2000;
+
+    let currentSlide = 1;
+    let currentBuild = 1;
+    let buildTimer = null;
+
+    const img = document.getElementById('slide');
+    const prev = document.getElementById('prev');
+    const next = document.getElementById('next');
+
+    const pad = (n) => String(n).padStart(2, '0');
+
+    function showFrame() {
+      img.src = `slides/slide_${pad(currentSlide)}_build_${pad(currentBuild)}.svg`;
+    }
+
+    function startBuildAnimation() {
+      clearTimeout(buildTimer);
+      currentBuild = 1;
+      showFrame();
+      scheduleNextBuild();
+    }
+
+    function scheduleNextBuild() {
+      if (currentBuild < BUILDS) {
+        buildTimer = setTimeout(() => {
+          currentBuild++;
+          showFrame();
+          scheduleNextBuild();
+        }, BUILD_INTERVAL_MS);
+      }
+    }
+
+    function goToSlide(n) {
+      const clamped = Math.max(1, Math.min(TOTAL_SLIDES, n));
+      if (clamped === currentSlide) return;
+      currentSlide = clamped;
+      updateArrows();
+      startBuildAnimation();
+    }
+
+    function updateArrows() {
+      prev.disabled = currentSlide === 1;
+      next.disabled = currentSlide === TOTAL_SLIDES;
+    }
+
+    prev.addEventListener('click', () => goToSlide(currentSlide - 1));
+    next.addEventListener('click', () => goToSlide(currentSlide + 1));
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') goToSlide(currentSlide - 1);
+      if (e.key === 'ArrowRight') goToSlide(currentSlide + 1);
+    });
+
+    updateArrows();
+    startBuildAnimation();
+  </script>
+</body>
+</html>
