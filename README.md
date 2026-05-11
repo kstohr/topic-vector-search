@@ -68,11 +68,11 @@ uv run streamlit run app.py
 ```bash
 
 # Control-C in the running terminal, or in a different terminal: 
-pkill -f "streamlit run app.py 
+pkill -f "streamlit run app.py" 
 docker compose down 
 -- make any changes necessary -- 
 uv sync 
-uv run streamlit run app.py (the app preloads sample posts on startup)
+uv run streamlit run app.py # the app preloads sample posts on startup
 ```
 ---
 
