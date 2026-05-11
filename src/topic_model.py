@@ -70,10 +70,12 @@ topic: <topic label>
 TOP_N_SEARCH_EMBEDDING_KEYWORDS = 3
 
 
+class NoTopicsFoundError(Exception):
+    """Raised when BERTopic finds no topics. Try adjusting model parameters."""
+
+
 class ProccessedPostsNotFoundError(FileNotFoundError):
     """Raised when processed_posts.json is missing for topic model training."""
-
-    pass
 
 
 class TopicModeler:
@@ -88,6 +90,7 @@ class TopicModeler:
         self.topic_model: BERTopic | None = None
         self.doc_index: dict[str, PostDocument] = {}
         self.elasticsearch_client = self._connect_elasticsearch()
+        self.n_topics = 0  # Number of topics found (excluding outliers)
 
     def _connect_elasticsearch(self) -> Elasticsearch | None:
         """Return a connected Elasticsearch client, or None if unavailable."""
@@ -171,7 +174,7 @@ class TopicModeler:
             stop_words="english",
         )
         hdbscan_model = HDBSCAN(
-            min_cluster_size=10,
+            min_cluster_size=200,
             min_samples=8,
             metric="euclidean",
             cluster_selection_method="eom",
@@ -206,10 +209,17 @@ class TopicModeler:
 
         self.topics, self.probabilities = self.topic_model.fit_transform(texts, embeddings_np)
 
+        logger.info("BERTopic training complete.")
+        logger.info("Found %d topics", len(self.topic_model.get_topic_info()))
+
         # BERTopic reserves topic ID -1 for outliers,
         # So the number of true topics is max ID + 1
-        n = self.topic_model.get_topic_info().shape[0] - 1
-        logger.info(f"Found {n} topics.")
+        self.n_topics = self.topic_model.get_topic_info().shape[0] - 1
+        if self.n_topics == 0:
+            logger.warning(
+                "No valid topics found — all documents assigned to outlier class. "
+                "Try adjusting BERTopic parameters (e.g. min_cluster_size, min_samples)."
+            )
         return self.topics, self.probabilities
 
     # ── Artifact storage ───────────────────────────────────────────────────
@@ -224,7 +234,6 @@ class TopicModeler:
             topic_id: [word for word, _ in self.topic_model.get_topic(topic_id)[:10]]
             for topic_id in valid_ids
         }
-
         self._save_model()
         self._save_assignments()
         self._save_labels(valid_ids, keywords_by_topic)
@@ -235,6 +244,12 @@ class TopicModeler:
 
     def _save_model(self) -> None:
         """Save BERTopic model binary to disk."""
+
+        if not self.topic_model:
+            raise RuntimeError("No topic model to save. Call train_topic_model() first.")
+        if self.n_topics == 0:
+            logger.warning("No valid topics found. Storing model will fail. Skipping model save.")
+            return
         model_path = str(self.output_path / "bertopic_model")
         os.makedirs(model_path, exist_ok=True)
         self.topic_model.save(
@@ -379,7 +394,11 @@ class TopicModeler:
 
     def generate_visualizations(self) -> None:
         """Write BERTopic HTML visualizations to output_path."""
-        if not self.topic_model:
+        if not self.topic_model or self.n_topics == 0:
+            logger.warning(
+                "No topic model or valid topics available for visualization."
+                " Skipping visualization."
+            )
             return
         out = str(self.output_path)
         self.topic_model.visualize_topics().write_html(f"{out}/topic_visualization.html")
