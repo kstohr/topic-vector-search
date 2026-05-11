@@ -70,10 +70,6 @@ class PostDocument(Post):
         # Add or remove preprocessing steps to clean text
         if text is None:
             text = self.post_text
-        text = emoji.demojize(text)  # .replace("_", " ")
-        text = text.lower()
-        text = re.sub(r"[^\w\s'-]", "", text)
-        text = re.sub(r"\s+", " ", text).strip()
         return text.strip()
 
     ##############################
