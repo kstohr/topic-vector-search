@@ -29,6 +29,11 @@ class EmptySearchIndexError(Exception):
     """Raised when the Elasticsearch index exists but contains no documents."""
 
 
+class MissingEmbeddingsError(Exception):
+    """Raised when document embeddings are required but not found in the input
+    data."""
+
+
 class KeywordSearcher:
     """Keyword search (lexical/BM25) via Elasticsearch."""
 
@@ -131,6 +136,26 @@ class SemanticSearcher:
         - If top_k is set: return top_k docs ranked by cosine similarity.
         - If top_k is None: return all matching docs ranked by cosine similarity.
         """
+        # Check if index has any documents at all
+        total_count = self.client.count(index=self.index_name).get("count", 0)
+        if total_count == 0:
+            raise EmptySearchIndexError(
+                f"Index '{self.index_name}' is empty — run src.preprocess to generate embeddings and index posts"
+            )
+        
+        # Check if doc_embedding field exists in the index before executing script_score
+        doc_embedding_count = self.client.count(
+            index=self.index_name,
+            body={"query": {"exists": {"field": "doc_embedding"}}}
+        ).get("count", 0)
+        
+        if doc_embedding_count == 0:
+            raise MissingEmbeddingsError(
+                "Semantic Search is not available. "
+                "One or more document embeddings are not stored. "
+                "Have you completed the generate_embeddings coding exercise and run preprocess.py?"
+            )
+        
         # ES requires size to be an integer; None means "return all up to the ES max"
         size = top_k if top_k is not None else 10_000
 
@@ -156,11 +181,6 @@ class SemanticSearcher:
         except ESConnectionError as e:
             raise ConnectionError("Check that the docker container is running") from e
         except BadRequestError as e:
-            count = self.client.count(index=self.index_name).get("count", 0)
-            if count == 0:
-                raise EmptySearchIndexError(
-                    f"Index '{self.index_name}' is empty — run src.preprocess to index posts"
-                ) from e
             raise
         hits = response["hits"]["hits"]
         results = [{"score": hit["_score"], **hit["_source"]} for hit in hits]
@@ -193,6 +213,12 @@ class InMemorySemanticSearcher:
         """Pre-normalise post embeddings into a matrix for fast cosine scoring."""
         self.embedding_model = SentenceTransformer(embedding_model_name)
         self.posts = posts
+        if not self.posts[0].get("doc_embedding"):
+            raise MissingEmbeddingsError(
+                "Semantic Search is not available. "
+                "One or more document embeddings are not stored. "
+                "Have you completed the generate_embeddings coding exercise and run preprocess.py?"
+            )
         embeddings = np.array([p["doc_embedding"] for p in posts], dtype=np.float32)
         norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
         self.embeddings_norm = embeddings / np.where(norms == 0, 1, norms)

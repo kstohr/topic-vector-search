@@ -34,6 +34,7 @@ from src.evaluation import (
 )
 from src.search import (
     _SEARCHER_LABELS,
+    MissingEmbeddingsError,
     TEXT_SEARCH_ENGINES,
     TOP_K_DEFAULT,
     TOPIC_SEARCH_ENGINES,
@@ -675,7 +676,11 @@ if st.session_state.show_topic_eval:
     active_eval_topic = st.session_state.eval_selected_topic_id
     if active_eval_topic is not None:
         info = labels[active_eval_topic]
-        results = _search_by_topic(active_eval_topic, top_k=DEFAULT_EVAL_K)
+        try:
+            results = _search_by_topic(active_eval_topic, top_k=DEFAULT_EVAL_K)
+        except MissingEmbeddingsError as error:
+            st.error(str(error))
+            results = []
 
         st.subheader(f"Results for {info['label']}")
         engine_label = get_searcher_label(build_topic_searcher(topic_engine))
@@ -701,11 +706,19 @@ if not st.session_state.show_topic_eval and (
         label = info.get("label", f"Topic {topic_id}")
         header_text = f"Results for {label}"
         with st.spinner("Searching…"):
-            results = _search_by_topic(topic_id, top_k=TOP_K_DEFAULT)
+            try:
+                results = _search_by_topic(topic_id, top_k=TOP_K_DEFAULT)
+            except MissingEmbeddingsError as error:
+                st.error(str(error))
+                results = []
     else:
         header_text = f'Results for "{query}"'
         with st.spinner("Searching…"):
-            results = _search_by_text(query, top_k=TOP_K_DEFAULT)
+            try:
+                results = _search_by_text(query, top_k=TOP_K_DEFAULT)
+            except MissingEmbeddingsError as error:
+                st.error(str(error))
+                results = []
 
     st.subheader(header_text)
     if topic_id is not None:
