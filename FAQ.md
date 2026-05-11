@@ -56,7 +56,7 @@ The **embedding space** is just the geometric coordinate system those vectors li
 in. For `all-MiniLM-L6-v2` it's a 384-d space (for `text-embedding-3-large` it's
 3072-d). All the geometric intuition you'd have about 3-d still applies — distance,
 direction, clustering — it just happens in higher dimensions. *Semantic search* is
-literally "find the nearest neighbours of the query vector in this space".
+literally "find the nearest neighbors of the query vector in this space".
 
 **Latent features** are the *individual dimensions* of the embedding. They're
 "latent" — hidden — because the model learned them from training data and no human
@@ -122,7 +122,7 @@ query embedding.
 - the *whole dataset*.
 
 It returns a label per point indicating which cluster it belongs to (or that it's
-an outlier). No query, no K. It's answering "what natural groupings exist in this
+an outlier). It's answering "what natural groupings exist in this
 data?", not "what's near this specific point?".
 
 A few more concrete differences:
@@ -130,12 +130,14 @@ A few more concrete differences:
 - **Direction of the question.** KNN: "Given this query, what's near it?"
   Clustering: "Given all the data, where are the dense regions?"
 - **Specifying K.** KNN's K is the *number of results* you want back. HDBSCAN
-  doesn't take a K — the data determines how many clusters there are. (k-means
-  *does* require K, which is one reason BERTopic prefers HDBSCAN.)
+  doesn't take a K — the algorithm runs an optimization sub-routine to
+  determine how many clusters there are. (k-means *does* require K, which is one
+  reason we use HDBSCAN.)
 - **Outliers.** HDBSCAN can label a point as `-1` (no cluster). KNN always returns
-  K results, even if they're all far away.
+  K results, even if they're all far away and may well be off-topic.
 - **Output shape.** KNN gives you a *ranked list*. Clustering gives you a *partition*
-  of the input.
+  of the input, in this case a set of topics that are more similar than they are
+  dissimilar.
 
 In this workshop both run, on the same embeddings, in different stages:
 
@@ -144,9 +146,8 @@ In this workshop both run, on the same embeddings, in different stages:
 2. The demo app uses KNN over cosine similarity to *retrieve* documents at query
    time, given either a user's text query or a topic centroid embedding.
 
-So: clustering builds the topics; KNN searches over them. They're complementary
-parts of the same pipeline.
-
+So: clustering builds the topics. KNN is used to search for documents that match
+the topic. 
 ---
 
 **Q: What is BERT? What is BERTopic? What is KeyBERT?**
@@ -163,7 +164,10 @@ objective, then fine-tune cheaply for any downstream task. Modern sentence
 transformers like `all-MiniLM-L6-v2` are descendants of BERT — smaller, distilled,
 and specifically fine-tuned to produce one good *sentence-level* vector.
 
-**BERTopic** (Maarten Grootendorst, 2020) is a Python topic-modeling **library**.
+**BERTopic** (Maarten Grootendorst, 2020) is a Python topic-modeling
+**library**.
+(Gensim is a similar package for topic modeling. Both include tools
+for evaluating the topics once the training pipeline has been run.)
 It assembles a pipeline of off-the-shelf components:
 
 ```
@@ -174,7 +178,9 @@ documents → embed (BERT-family) → UMAP → HDBSCAN → CountVectorizer
 Each stage is configurable — you can swap the embedding model, the dimensionality
 reducer, the clustering algorithm, and the labelling step. BERTopic doesn't *invent*
 any one of those algorithms; it's the glue that makes them work well together for
-topic modeling. In this repo, BERTopic is what `src/topic_model.py` orchestrates.
+topic modeling. In this repo, BERTopic is what `src/topic_model.py`
+orchestrates. 
+
 
 **KeyBERT** (also Maarten Grootendorst) is a small **library** for *keyword
 extraction*. Given a single document and an embedding model, it:
@@ -192,8 +198,9 @@ centroid, which is what feeds the *localized* topic embeddings explored in
 Notebook 5.
 
 **Quick disambiguation:**
-- BERT → a *model architecture / family of pre-trained weights*.
-- BERTopic → a *library* for end-to-end topic modeling.
+- BERT → a *model architecture / family of pre-trained open-weight models*.
+- BERTopic → a *library* for end-to-end topic modeling that makes use of
+  BERT-based models.
 - KeyBERT → a *library* for keyword extraction. BERTopic uses it as one component.
 
 You can absolutely use BERTopic without ever caring about the original BERT — and
