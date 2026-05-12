@@ -68,6 +68,7 @@ class PostDocument(Post):
         """
         ### EXERCISE ###
         # Add or remove preprocessing steps to clean text
+        # Run `uv run pytest tests/test_models.py -k PreprocessText`
         if text is None:
             text = self.post_text
         return text.strip()
