@@ -147,7 +147,7 @@ class PreprocessingPipeline:
         # Use self._vision_model.generate() to produce caption token IDs
         # Decode the token IDs back to a string with self._vision_processor.decode()
         # Store the result: postdoc.image_caption = caption
-        # You can run `uv run pytest -k TestCaptionSinglePost` to test your
+        # Run `uv run pytest -k TestCaptionSinglePost` to test your
         # implementation.
 
     def caption_images(self, postdocs: list[PostDocument]) -> list[PostDocument]:

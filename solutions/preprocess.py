@@ -182,6 +182,7 @@ class PreprocessingPipeline:
         To illustrate the underlying steps, and to ensure cross-device
         compatibility, we use the processor and model directly here.
         """
+
         if not postdoc.image_url:
             return
         # Load the image from disk and convert to RGB (BLIP expects 3-channel input)
@@ -193,6 +194,7 @@ class PreprocessingPipeline:
         image = Image.open(img_path).convert("RGB")
         logger.info(f"Captioning {img_path.name} (size: {image.size})…")
 
+        ### EXERCISE SOLUTION ###
         # Process the image
         # Image is resized and normalized according to model requirements.
         # The output is a tensor (4D array, shape [1, 3, H, W])
@@ -232,6 +234,7 @@ class PreprocessingPipeline:
         Embed all postdocs using the embedding model.
         """
         logger.info(f"Embedding {len(postdocs)} postdocs…")
+        ### EXERCISE SOLUTION ###
         # Extract the text to embed for each postdoc.
         # Builds the text string that is passed to the model.
         # Combines elements of the structured document into a single string,
