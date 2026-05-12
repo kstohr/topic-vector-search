@@ -173,7 +173,7 @@ class TopicModeler:
             min_cluster_size=5,  # smallest cluster size
             min_samples=None,  # None -> uses min_cluster_size
             metric="euclidean",  # distance in UMAP space; Hint: Match UMAP.output_metric above.
-            cluster_selection_method="eom",  # stable cluster extraction; alternative: 'leaf' picks the smallest clusters at the leaves of the cluster hierarchy.
+            cluster_selection_method="eom",  # stable cluster extraction; alternative: 'leaf'
             allow_single_cluster=False,  # avoid one giant cluster
             #  Not the default, required by BERTopic for downstream visualizations and analyses.
             prediction_data=True,  # needed for BERTopic probabilities; Do not change.
