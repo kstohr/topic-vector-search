@@ -151,11 +151,6 @@ class TopicModeler:
         embeddings_np = np.array(embeddings, dtype=np.float32)
         logger.info(f"Training on {len(texts)} posts.")
 
-        ### EXERCISE SOLUTION###
-        # The parameter below are a good starting point for finding the 7 distinct topics in the
-        # generated dataset.  Other combinations of parameters may also work.
-        # See explanations for the changes in the docstring above.
-
         ### EXERCISE ###
         # Review the parameters passed to the BERTopic constructor below. These
         # are the default parameters. Try changing some of them and see how it
@@ -164,15 +159,12 @@ class TopicModeler:
         # Objective: Tune the model to find the 7 distinct topics created by
         # generator_posts.py.
 
-        # Below are the parameters I changed to achieve this, but other combinations
-        # may also work:
-
         umap_model = UMAP(
             n_neighbors=15,  # local vs global balance
             n_components=2,  # output dimensions
             metric="euclidean",  # distance in input space
             output_metric="euclidean",  # distance in reduced space
-            min_dist=0.1,  # minimum spacing in projection
+            min_dist=0.1,  # default minimum spacing in projection
             random_state=RANDOM_SEED,  # reproducibility
             # Other UMAP parameters can be tuned as well, but these are the most
             # impactful for topic modeling results.

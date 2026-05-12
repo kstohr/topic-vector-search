@@ -29,14 +29,6 @@ generator_posts.py created (7 topics x 20 posts.)
 
 Non-default params that helped tune the model output:
 
-- UMAP min_dist=0.0
-Reason: default is 0.1. This changes how tightly points can pack in reduced
-space, which changes clustering outcomes. A smaller min_dist allows points to be
-closer together, which can lead to more cohesive topics, but if set too low it
-may cause topics to merge together. I found that 0.0 worked well but may not
-affect the outcome as much as HDBSCAN min_cluster_size and min_samples, which
-have a larger effect on topic granularity and cohesiveness.
-
 - UMAP metric="cosine"
 Reason: default is euclidean. This usually has a large effect on neighborhood
 structure and final topics. But wait a second... have we learned nothing today
@@ -173,16 +165,10 @@ class TopicModeler:
         """
         logger.info("Training BERTopic model.")
 
-        ### EXERCISE ###
-        # Review the parameters passed to the BERTopic constructor below. These
-        # are the default parameters. Try changing some of them and see how it
-        # affects the resulting topics.
-
-        # Objective: Tune the model to find the 7 distinct topics created by
-        # generator_posts.py.
-
-        # Below are the parameters I changed to achieve this, but other combinations
-        # may also work:
+        ### EXERCISE SOLUTION ###
+        # The parameter below are a good starting point for finding the 7 distinct topics in the
+        # generated dataset.  Other combinations of parameters may also work.
+        # See explanations for the changes in the docstring above.
 
         if not self.doc_index:
             raise RuntimeError("No post documents available for training.")
@@ -211,6 +197,8 @@ class TopicModeler:
         vectorizer = CountVectorizer(
             stop_words="english",  # remove common English stop words
             ngram_range=(1, 3),  # include uni/bi/trigrams
+            min_df=1,  # include terms that appear in at least 1 document
+            max_df=1.0,  # include terms that appear in at most 100% of documents (i.e. no max_df filtering)
         )
         keybert_model = KeyBERTInspired(
             top_n_words=10,  # final words kept per topic
@@ -226,8 +214,10 @@ class TopicModeler:
 
         # TUNED (UMAP): metric and min_dist changes from defaults.
         umap_model = UMAP(
+            n_neighbors=15,  # local vs global balance
+            n_components=2,  # output dimensions
             metric="cosine",  # distance in input space; Cosine distance!!!
-            min_dist=0.0,  # minimum spacing in projection
+            output_metric="euclidean",  # distance in reduced space
             random_state=RANDOM_SEED,  # reproducibility
         )
         # TUNED (HDBSCAN): cluster size/samples changed from defaults.
@@ -252,9 +242,9 @@ class TopicModeler:
             ctfidf_model=ClassTfidfTransformer(),  # class-based TF-IDF reweighting
             representation_model=representation,  # topic labeling models
             # Sets HDBSCAN's min_cluster_size. If not set above.
-            # min_topic_size=10,  # Ignore.
+            min_topic_size=5,  # Ignore.
             # Sets CountVectorizer's ngram_range. If not set above.
-            # n_gram_range=(1, 1), # Ignore.
+            n_gram_range=(1, 1),  # Ignore.
             top_n_words=10,  # words returned per topic
             # Required for topic evaluation
             calculate_probabilities=True,  # return per-topic probabilities; Do not change.
