@@ -61,9 +61,10 @@ class PostDocument(Post):
 
     def preprocess_text(self, text: str | None = None) -> str:
         """
-        Passed to model pipeline. Standard pre-processing of text after cleaning,
-        prior to modeling. Does not include sentence splitting. If sentence
-        embeddings are needed use `preprocess_sentences`.
+        Handled during preprocessing in `preprocess.py`. Cleans attributes of
+        the text that require transformation prior to tokenization. Does not
+        include sentence splitting. If sentence embeddings are needed, see
+        `preprocess_sentences` below.
         """
         ### EXERCISE ###
         # Add or remove preprocessing steps to clean text
