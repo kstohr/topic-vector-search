@@ -104,7 +104,7 @@ def _make_embedding_pipeline(
 
 def test_text_only_returns_preprocessed_text() -> None:
     result = extract_embedding_text(make("Hello World!"))
-    assert result == "hello world"
+    assert result == "Hello World!"
 
 
 def test_caption_only_returns_caption() -> None:
@@ -190,7 +190,7 @@ class TestGenerateEmbeddings:
 
         assert result is postdocs
         assert fake_embedding_model.called is True
-        assert fake_embedding_model.last_texts == ["hello world A cat", "only caption"]
+        assert fake_embedding_model.last_texts == ["Hello world A cat", "only caption"]
         assert np.allclose(postdocs[0].doc_embedding, [0.1, 0.2])
         assert np.allclose(postdocs[1].doc_embedding, [0.3, 0.4])
 

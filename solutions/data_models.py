@@ -6,7 +6,6 @@ Pydantic models for raw posts (Post) and processed post documents
 (PostDocument).
 """
 
-import re
 from datetime import UTC, datetime
 
 import emoji
@@ -62,16 +61,15 @@ class PostDocument(Post):
 
     def preprocess_text(self, text: str | None = None) -> str:
         """
-        Passed to model pipeline. Standard pre-processing of text after cleaning,
-        prior to modeling. Does not include sentence splitting. If sentence
-        embeddings are needed use `preprocess_sentences`.
+        Handled during preprocessing in `preprocess.py`. Cleans attributes of
+        the text that require transformation prior to tokenization. Does not
+        include sentence splitting. If sentence embeddings are needed, see
+        `preprocess_sentences` below.
         """
+        ### EXERCISE SOLUTION ###
         if text is None:
             text = self.post_text
         text = emoji.demojize(text).replace("_", " ")
-        text = text.lower()
-        text = re.sub(r"[^\w\s'-]", "", text)
-        text = re.sub(r"\s+", " ", text).strip()
         return text.strip()
 
     ##############################

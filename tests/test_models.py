@@ -34,29 +34,28 @@ class TestPostDocumentDefaults:
 
 
 class TestPreprocessText:
-    def test_lowercases_text(self) -> None:
+    def test_preserves_text_case(self) -> None:
         post = make_post(post_text="HELLO WORLD")
-        assert post.preprocess_text() == "hello world"
+        assert post.preprocess_text() == "HELLO WORLD"
 
-    def test_strips_punctuation(self) -> None:
+    def test_preserves_punctuation(self) -> None:
         post = make_post(post_text="Hello, world!")
         result = post.preprocess_text()
-        assert "," not in result
-        assert "!" not in result
+        assert "," in result
+        assert "!" in result
 
     def test_preserves_contractions(self) -> None:
         post = make_post(post_text="It's a beautiful day")
-        assert "it's" in post.preprocess_text()
+        assert "It's" in post.preprocess_text()
 
-    def test_converts_emoji_to_text(self) -> None:
+    def test_preserves_emoji(self) -> None:
         post = make_post(post_text="I love cats 🐱")
         result = post.preprocess_text()
-        assert "cat" in result
-        assert "🐱" not in result
+        assert "🐱" in result
 
-    def test_collapses_whitespace(self) -> None:
+    def test_preserves_internal_whitespace(self) -> None:
         post = make_post(post_text="too   many    spaces")
-        assert "  " not in post.preprocess_text()
+        assert post.preprocess_text() == "too   many    spaces"
 
     def test_empty_text_returns_empty(self) -> None:
         post = make_post(post_text="")
