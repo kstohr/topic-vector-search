@@ -38,7 +38,6 @@ from bertopic.representation import OpenAI as BertTopicOpenAI
 from bertopic.vectorizers import ClassTfidfTransformer
 from elasticsearch import Elasticsearch
 from hdbscan import HDBSCAN
-from joblib import Memory
 from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import CountVectorizer
 from umap import UMAP
@@ -152,86 +151,98 @@ class TopicModeler:
         embeddings_np = np.array(embeddings, dtype=np.float32)
         logger.info(f"Training on {len(texts)} posts.")
 
+        ### EXERCISE SOLUTION###
+        # The parameter below are a good starting point for finding the 7 distinct topics in the
+        # generated dataset.  Other combinations of parameters may also work.
+        # See explanations for the changes in the docstring above.
+
         ### EXERCISE ###
         # Review the parameters passed to the BERTopic constructor below. These
         # are the default parameters. Try changing some of them and see how it
         # affects the resulting topics.
-        # - Can you force the model to find more or fewer topics? More specific or
-        # more general topics?
-        # - Can you change how the AI labels are generated to use either more
-        # common or less common words?
 
         # Objective: Tune the model to find the 7 distinct topics created by
         # generator_posts.py.
 
+        # Below are the parameters I changed to achieve this, but other combinations
+        # may also work:
+
         umap_model = UMAP(
-            n_neighbors=15,
-            n_components=2,
-            metric="euclidean",
-            output_metric="euclidean",
-            min_dist=0.1,
-            random_state=RANDOM_SEED,
-            # Other UMAP parameters can be tuned as well, but these are the most impactful for topic modeling results.
+            n_neighbors=15,  # local vs global balance
+            n_components=2,  # output dimensions
+            metric="euclidean",  # distance in input space
+            output_metric="euclidean",  # distance in reduced space
+            min_dist=0.1,  # minimum spacing in projection
+            random_state=RANDOM_SEED,  # reproducibility
+            # Other UMAP parameters can be tuned as well, but these are the most
+            # impactful for topic modeling results.
         )
         hdbscan_model = HDBSCAN(
-            min_cluster_size=5,
-            min_samples=None,
-            metric="euclidean", # Hint: Match UMAP.output_metric above.
-            cluster_selection_method="eom",
-            allow_single_cluster=False,
-            prediction_data=True, # This is not the default, but is required for some downstream visualizations and analyses. Do not change.
+            min_cluster_size=5,  # smallest cluster size
+            min_samples=None,  # None -> uses min_cluster_size
+            metric="euclidean",  # distance in UMAP space; Hint: Match UMAP.output_metric above.
+            cluster_selection_method="eom",  # stable cluster extraction; alternative: 'leaf' picks the smallest clusters at the leaves of the cluster hierarchy.
+            allow_single_cluster=False,  # avoid one giant cluster
+            #  Not the default, required by BERTopic for downstream visualizations and analyses.
+            prediction_data=True,  # needed for BERTopic probabilities; Do not change.
         )
         # Used for topic word extraction after clustering.
-        vectorizer = CountVectorizer(
-            input="content",
-            encoding="utf-8",
-            decode_error="strict",
-            strip_accents=None,
-            lowercase=True,
-            # We have already preprocessed the text, but if we wanted to add additional steps we could call a function here
-            preprocessor=None,
+        vectorizer = CountVectorizer(  # nosec B106
+            input="content",  # Pass raw preprocessed text directly to the vectorizer
+            encoding="utf-8",  # text encoding
+            decode_error="strict",  # fail on bad decode
+            strip_accents=None,  # keep accents
+            lowercase=True,  # lowercase tokens
+            # We have already preprocessed the text, but if we wanted to add
+            # additional steps we could call a function here
+            preprocessor=None,  # optional custom preprocessor
             # If we wanted to customize tokenization we could call a function here
-            tokenizer=None,
-            stop_words=None,
-            token_pattern=r"(?u)\b\w\w+\b",  # noqa: B106
-            ngram_range=(1, 1),
-            analyzer="word",
-            max_df=1.0,
-            min_df=1,
-            max_features=None,
-            # We can also provide a custom vocabulary of words to consider for topic modeling. By default it uses all words that appear in the corpus.
-            vocabulary=None,
-            binary=False,
-            dtype=np.int64,
+            tokenizer=None,  # optional custom tokenizer
+            stop_words=None,  # no stop-word list
+            token_pattern=r"(?u)\b\w\w+\b",  # token regex (2+ chars)  # noqa: B106
+            ngram_range=(1, 1),  # unigrams only
+            analyzer="word",  # analyze at word level
+            max_df=1.0,  # keep very common terms
+            min_df=1,  # keep rare terms
+            max_features=None,  # no vocab cap
+            # We can also provide a custom vocabulary of words to consider for
+            # topic modeling. By default it uses all words that appear in the corpus.
+            vocabulary=None,  # learn vocabulary from corpus
+            binary=False,  # use term counts, not binary
+            dtype=np.int64,  # matrix integer type
         )
         # Used for topic labeling (represenantation) and generating the
         # topic_keyword_embeddings
         # See: notebooks/O5_noise.ipynb for an explanation of KeyBERT
         keybert_model = KeyBERTInspired(
-            top_n_words=10,
-            nr_repr_docs=5,
-            nr_samples=500,
-            nr_candidate_words=100,
-            random_state=RANDOM_SEED,
+            top_n_words=10,  # final words kept per topic
+            nr_repr_docs=5,  # representative docs used per topic
+            nr_samples=500,  # candidate docs sampled per topic
+            nr_candidate_words=100,  # candidate words considered per topic
+            random_state=RANDOM_SEED,  # reproducibility
         )
-        # LLM-based labels. Uses Ollama if available, otherwise OpenAI API if OPENAI_API_KEY is set, otherwise falls back to KeyBERT keywords.
+        # LLM-based labels. Uses Ollama if available, otherwise OpenAI API if
+        # OPENAI_API_KEY is set, otherwise falls back to KeyBERT keywords.
         llm_model: BertTopicOpenAI | None = build_llm_representation(prompt=LABEL_PROMPT)
         representation = {"KeyBERT": keybert_model}
         if llm_model:
             representation["LLM"] = llm_model
 
         self.topic_model = BERTopic(
-            embedding_model=self.embedding_model,
-            umap_model=umap_model,
-            hdbscan_model=hdbscan_model,
-            vectorizer_model=vectorizer,
-            ctfidf_model=ClassTfidfTransformer(),
-            representation_model=representation,
-            # min_topic_size=10,  # Sets HDBSCAN's min_cluster_size. See above.
-            n_gram_range=(1, 3),
-            top_n_words=10,
-            calculate_probabilities=True,
-            verbose=True,
+            embedding_model=self.embedding_model,  # document embedding model
+            umap_model=umap_model,  # dimensionality reduction model
+            hdbscan_model=hdbscan_model,  # clustering model
+            vectorizer_model=vectorizer,  # topic vocabulary model
+            ctfidf_model=ClassTfidfTransformer(),  # class-based TF-IDF reweighting
+            representation_model=representation,  # topic labeling models
+            # Sets HDBSCAN's min_cluster_size. If not set above.
+            # min_topic_size=10,  # Ignore.
+            # Sets CountVectorizer's ngram_range. If not set above.
+            # n_gram_range=(1, 1), # Ignore.
+            top_n_words=10,  # words returned per topic
+            # Required for topic evaluation
+            calculate_probabilities=True,  # return per-topic probabilities; Do not change.
+            verbose=True,  # log BERTopic progress
         )
 
         self.topics, self.probabilities = self.topic_model.fit_transform(texts, embeddings_np)

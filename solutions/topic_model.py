@@ -22,6 +22,51 @@ LLM labeling priority:
   1. Ollama at localhost:11434  (no API key needed)
   2. OPENAI_API_KEY env var     (OpenAI API)
   3. KeyBERT keywords only      (no LLM)
+
+
+BERTopic parameters are set to produce the same number of topics that
+generator_posts.py created (7 topics x 20 posts.)
+
+Non-default params that helped tune the model output:
+
+- UMAP min_dist=0.0
+Reason: default is 0.1. This changes how tightly points can pack in reduced
+space, which changes clustering outcomes. A smaller min_dist allows points to be
+closer together, which can lead to more cohesive topics, but if set too low it
+may cause topics to merge together. I found that 0.0 worked well but may not
+affect the outcome as much as HDBSCAN min_cluster_size and min_samples, which
+have a larger effect on topic granularity and cohesiveness.
+
+- UMAP metric="cosine"
+Reason: default is euclidean. This usually has a large effect on neighborhood
+structure and final topics. But wait a second... have we learned nothing today
+about embedding space and measuring distance? Cosine distance is typically a better
+choice for high-dimensional semantic spaces. We want to capture the angle
+between vectors (i.e. their relative similarity) rather than their absolute
+distance, which can be less meaningful in high dimensions. Of course, if your
+embeddings are L2-normalized, cosine similarity and euclidean distance will
+yield the same nearest neighbors, so in that case it may not make a difference.
+
+- HDBSCAN min_cluster_size=10
+Reason: default is 5. This changes cluster granularity and number of discovered
+topics. I raised this to prevent topics from splintering into small sub-topics.
+For example, the chinese character posts are mostly about cats. With a small
+min_cluster_size you might get a cluster of just the cat posts that include
+chinese characters.
+
+- HDBSCAN min_samples=8
+Reason: default is None. This changes how conservative clustering is and how
+many outliers you get. Again, I raised this to ensure the topics were more
+distinct and cohesive, at the cost of more outliers.
+
+- CountVectorizer ngram_range=(1, 3)
+Reason: default is (1, 1). This changes topic-word/label representation
+significantly. It catches terms such as "High Speed Rail" that are important for
+topic coherence and labeling.
+
+- CountVectorizer stop_words="english"
+Reason: default is None. This changes extracted topic terms and labels. We
+remove common words to get more meaningful labels.
 """
 
 import json
@@ -42,8 +87,7 @@ from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import CountVectorizer
 from umap import UMAP
 
-from solutions.ai_labeler import build_llm_representation
-from solutions.preprocess import extract_embedding_text
+from src.ai_labeler import build_llm_representation
 from src.config import (
     ELASTICSEARCH_URL,
 )
@@ -51,6 +95,7 @@ from src.config import (
     EMBEDDING_MODEL_NAME as EMBEDDING_MODEL,
 )
 from src.data_models import PostDocument
+from src.preprocess import extract_embedding_text
 from src.retrieve_postdocs import retrieve_postdocs_from_disk, retrieve_postdocs_from_elasticsearch
 
 logger = logging.getLogger(__name__)
@@ -70,10 +115,12 @@ topic: <topic label>
 TOP_N_SEARCH_EMBEDDING_KEYWORDS = 3
 
 
+class NoTopicsFoundError(Exception):
+    """Raised when BERTopic finds no topics. Try adjusting model parameters."""
+
+
 class ProccessedPostsNotFoundError(FileNotFoundError):
     """Raised when processed_posts.json is missing for topic model training."""
-
-    pass
 
 
 class TopicModeler:
@@ -88,6 +135,7 @@ class TopicModeler:
         self.topic_model: BERTopic | None = None
         self.doc_index: dict[str, PostDocument] = {}
         self.elasticsearch_client = self._connect_elasticsearch()
+        self.n_topics = 0  # Number of topics found (excluding outliers)
 
     def _connect_elasticsearch(self) -> Elasticsearch | None:
         """Return a connected Elasticsearch client, or None if unavailable."""
@@ -126,13 +174,15 @@ class TopicModeler:
         logger.info("Training BERTopic model.")
 
         ### EXERCISE ###
-        # Review the parameters passed to the BERTopic constructor below. Try
-        # changing some of them and see how it affects the resulting topics.
-        # Can you force the model to find more or fewer topics? More specific or
-        # more general topics?
-        # Can you change how the AI labels are generated to use either more
-        # common or less common words?
-        # Can you force the model to fail?
+        # Review the parameters passed to the BERTopic constructor below. These
+        # are the default parameters. Try changing some of them and see how it
+        # affects the resulting topics.
+
+        # Objective: Tune the model to find the 7 distinct topics created by
+        # generator_posts.py.
+
+        # Below are the parameters I changed to achieve this, but other combinations
+        # may also work:
 
         if not self.doc_index:
             raise RuntimeError("No post documents available for training.")
@@ -157,58 +207,71 @@ class TopicModeler:
         embeddings_np = np.array(embeddings, dtype=np.float32)
         logger.info(f"Training on {len(texts)} posts.")
 
+        # TUNED (CountVectorizer): changes from defaults
         vectorizer = CountVectorizer(
-            min_df=1,
-            max_df=1.0,
-            ngram_range=(1, 3),
-            stop_words="english",
+            stop_words="english",  # remove common English stop words
+            ngram_range=(1, 3),  # include uni/bi/trigrams
         )
         keybert_model = KeyBERTInspired(
-            top_n_words=10,
-            nr_repr_docs=5,
-            nr_samples=500,
-            nr_candidate_words=100,
-            random_state=RANDOM_SEED,
+            top_n_words=10,  # final words kept per topic
+            nr_repr_docs=5,  # representative docs used per topic
+            nr_samples=500,  # candidate docs sampled per topic
+            nr_candidate_words=100,  # candidate words considered per topic
+            random_state=RANDOM_SEED,  # reproducibility
         )
         llm_model: BertTopicOpenAI | None = build_llm_representation(prompt=LABEL_PROMPT)
         representation = {"KeyBERT": keybert_model}
         if llm_model:
             representation["LLM"] = llm_model
 
+        # TUNED (UMAP): metric and min_dist changes from defaults.
         umap_model = UMAP(
-            n_neighbors=15,
-            n_components=2,
-            min_dist=0.0,
-            metric="cosine",
-            random_state=RANDOM_SEED,
+            metric="cosine",  # distance in input space; Cosine distance!!!
+            min_dist=0.0,  # minimum spacing in projection
+            random_state=RANDOM_SEED,  # reproducibility
         )
+        # TUNED (HDBSCAN): cluster size/samples changed from defaults.
+        # Non-default but required: prediction_data=True for probabilities.
         hdbscan_model = HDBSCAN(
-            min_cluster_size=10,
-            min_samples=8,
-            metric="euclidean",
-            cluster_selection_method="eom",
-            prediction_data=True,
+            min_cluster_size=10,  # smallest cluster size
+            min_samples=8,  # higher -> more conservative clustering
+            # Default is "euclidean." Because UMAP outputs a reduced dimensional
+            # space based on euclidean distance, here we use euclidean distance
+            # for clustering.
+            metric="euclidean",  # distance in UMAP space
+            # Default is "eom". Balances cluster stability and sensitivity.
+            # You could experiment with "leaf" for more granular, hierarchical clustering.
+            cluster_selection_method="eom",  # stable cluster extraction
+            prediction_data=True,  # needed for BERTopic probabilities
         )
         self.topic_model = BERTopic(
-            embedding_model=self.embedding_model,
-            umap_model=umap_model,
-            hdbscan_model=hdbscan_model,
-            vectorizer_model=vectorizer,
-            ctfidf_model=ClassTfidfTransformer(),
-            representation_model=representation,
-            min_topic_size=5,
-            n_gram_range=(1, 3),
-            top_n_words=10,
-            calculate_probabilities=True,
-            verbose=True,
+            embedding_model=self.embedding_model,  # document embedding model
+            umap_model=umap_model,  # dimensionality reduction model
+            hdbscan_model=hdbscan_model,  # clustering model
+            vectorizer_model=vectorizer,  # topic vocabulary model
+            ctfidf_model=ClassTfidfTransformer(),  # class-based TF-IDF reweighting
+            representation_model=representation,  # topic labeling models
+            # Sets HDBSCAN's min_cluster_size. If not set above.
+            # min_topic_size=10,  # Ignore.
+            # Sets CountVectorizer's ngram_range. If not set above.
+            # n_gram_range=(1, 1), # Ignore.
+            top_n_words=10,  # words returned per topic
+            # Required for topic evaluation
+            calculate_probabilities=True,  # return per-topic probabilities; Do not change.
+            verbose=True,  # log BERTopic progress
         )
 
         self.topics, self.probabilities = self.topic_model.fit_transform(texts, embeddings_np)
 
         # BERTopic reserves topic ID -1 for outliers,
         # So the number of true topics is max ID + 1
-        n = self.topic_model.get_topic_info().shape[0] - 1
-        logger.info(f"Found {n} topics.")
+        self.n_topics = self.topic_model.get_topic_info().shape[0] - 1
+        if self.n_topics == 0:
+            logger.warning(
+                "No valid topics found — all documents assigned to outlier class. "
+                "Try adjusting BERTopic parameters (e.g. min_cluster_size, min_samples)."
+            )
+        logger.info(f"Found {self.n_topics} topics.")
         return self.topics, self.probabilities
 
     # ── Artifact storage ───────────────────────────────────────────────────
@@ -223,7 +286,6 @@ class TopicModeler:
             topic_id: [word for word, _ in self.topic_model.get_topic(topic_id)[:10]]
             for topic_id in valid_ids
         }
-
         self._save_model()
         self._save_assignments()
         self._save_labels(valid_ids, keywords_by_topic)
@@ -234,6 +296,12 @@ class TopicModeler:
 
     def _save_model(self) -> None:
         """Save BERTopic model binary to disk."""
+
+        if not self.topic_model:
+            raise RuntimeError("No topic model to save. Call train_topic_model() first.")
+        if self.n_topics == 0:
+            logger.warning("No valid topics found. Storing model will fail. Skipping model save.")
+            return
         model_path = str(self.output_path / "bertopic_model")
         os.makedirs(model_path, exist_ok=True)
         self.topic_model.save(
@@ -289,12 +357,31 @@ class TopicModeler:
                 "topic_embeddings_ not found on topic model. "
                 "Check that the model is fitted before calling store_model_data()."
             )
-        # index 0 = outlier cluster, real topics start at 1
         topic_embeddings = self.topic_model.topic_embeddings_
+        topic_info = self.topic_model.get_topic_info()
+
+        # BERTopic's topic_embeddings_ array is positional, not keyed by topic id.
+        # Build a id->embedding mapping using topic_info row order.
+        topic_ids_in_order = [int(t) for t in topic_info["Topic"].tolist()]
+
+        if len(topic_embeddings) != len(topic_ids_in_order):
+            raise ValueError(
+                f"topic_embeddings_ length ({len(topic_embeddings)}) does not match "
+                f"topic_info Topic count ({len(topic_ids_in_order)}). "
+                "BERTopic internal state may be corrupted."
+            )
+
+        topic_embedding_map: dict[int, list[float]] = {
+            topic_id: embedding.tolist()
+            for topic_id, embedding in zip(topic_ids_in_order, topic_embeddings, strict=True)
+            if topic_id != -1
+        }
+
+        # Keep only valid non-outlier topics
         topic_embedding_map = {
-            topic_id: topic_embeddings[topic_id + 1].tolist()
+            topic_id: topic_embedding_map[topic_id]
             for topic_id in valid_ids
-            if (topic_id + 1) < len(topic_embeddings)
+            if topic_id in topic_embedding_map
         }
         with open(self.output_path / "topic_embeddings.json", "w") as f:
             json.dump(
@@ -359,7 +446,11 @@ class TopicModeler:
 
     def generate_visualizations(self) -> None:
         """Write BERTopic HTML visualizations to output_path."""
-        if not self.topic_model:
+        if not self.topic_model or self.n_topics == 0:
+            logger.warning(
+                "No topic model or valid topics available for visualization."
+                " Skipping visualization."
+            )
             return
         out = str(self.output_path)
         self.topic_model.visualize_topics().write_html(f"{out}/topic_visualization.html")
