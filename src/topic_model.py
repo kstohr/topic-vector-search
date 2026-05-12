@@ -38,6 +38,7 @@ from bertopic.representation import OpenAI as BertTopicOpenAI
 from bertopic.vectorizers import ClassTfidfTransformer
 from elasticsearch import Elasticsearch
 from hdbscan import HDBSCAN
+from joblib import Memory
 from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import CountVectorizer
 from umap import UMAP
@@ -128,15 +129,6 @@ class TopicModeler:
         """
         logger.info("Training BERTopic model.")
 
-        ### EXERCISE ###
-        # Review the parameters passed to the BERTopic constructor below. Try
-        # changing some of them and see how it affects the resulting topics.
-        # Can you force the model to find more or fewer topics? More specific or
-        # more general topics?
-        # Can you change how the AI labels are generated to use either more
-        # common or less common words?
-        # Can you force the model to fail?
-
         if not self.doc_index:
             raise RuntimeError("No post documents available for training.")
 
@@ -160,26 +152,61 @@ class TopicModeler:
         embeddings_np = np.array(embeddings, dtype=np.float32)
         logger.info(f"Training on {len(texts)} posts.")
 
+        ### EXERCISE ###
+        # Review the parameters passed to the BERTopic constructor below. These
+        # are the default parameters. Try changing some of them and see how it
+        # affects the resulting topics.
+        # - Can you force the model to find more or fewer topics? More specific or
+        # more general topics?
+        # - Can you change how the AI labels are generated to use either more
+        # common or less common words?
+
+        # Objective: Tune the model to find the 7 distinct topics created by
+        # generator_posts.py.
+
         umap_model = UMAP(
             n_neighbors=15,
             n_components=2,
-            min_dist=0.0,
-            metric="cosine",
+            metric="euclidean",
+            output_metric="euclidean",
+            min_dist=0.1,
             random_state=RANDOM_SEED,
-        )
-        vectorizer = CountVectorizer(
-            min_df=1,
-            max_df=1.0,
-            ngram_range=(1, 3),
-            stop_words="english",
+            # Other UMAP parameters can be tuned as well, but these are the most impactful for topic modeling results.
         )
         hdbscan_model = HDBSCAN(
-            min_cluster_size=200,
-            min_samples=8,
-            metric="euclidean",
+            min_cluster_size=5,
+            min_samples=None,
+            metric="euclidean", # Hint: Match UMAP.output_metric above.
             cluster_selection_method="eom",
-            prediction_data=True,
+            allow_single_cluster=False,
+            prediction_data=True, # This is not the default, but is required for some downstream visualizations and analyses. Do not change.
         )
+        # Used for topic word extraction after clustering.
+        vectorizer = CountVectorizer(
+            input="content",
+            encoding="utf-8",
+            decode_error="strict",
+            strip_accents=None,
+            lowercase=True,
+            # We have already preprocessed the text, but if we wanted to add additional steps we could call a function here
+            preprocessor=None,
+            # If we wanted to customize tokenization we could call a function here
+            tokenizer=None,
+            stop_words=None,
+            token_pattern=r"(?u)\b\w\w+\b",  # noqa: B106
+            ngram_range=(1, 1),
+            analyzer="word",
+            max_df=1.0,
+            min_df=1,
+            max_features=None,
+            # We can also provide a custom vocabulary of words to consider for topic modeling. By default it uses all words that appear in the corpus.
+            vocabulary=None,
+            binary=False,
+            dtype=np.int64,
+        )
+        # Used for topic labeling (represenantation) and generating the
+        # topic_keyword_embeddings
+        # See: notebooks/O5_noise.ipynb for an explanation of KeyBERT
         keybert_model = KeyBERTInspired(
             top_n_words=10,
             nr_repr_docs=5,
@@ -187,7 +214,7 @@ class TopicModeler:
             nr_candidate_words=100,
             random_state=RANDOM_SEED,
         )
-
+        # LLM-based labels. Uses Ollama if available, otherwise OpenAI API if OPENAI_API_KEY is set, otherwise falls back to KeyBERT keywords.
         llm_model: BertTopicOpenAI | None = build_llm_representation(prompt=LABEL_PROMPT)
         representation = {"KeyBERT": keybert_model}
         if llm_model:
@@ -200,7 +227,7 @@ class TopicModeler:
             vectorizer_model=vectorizer,
             ctfidf_model=ClassTfidfTransformer(),
             representation_model=representation,
-            min_topic_size=5,
+            # min_topic_size=10,  # Sets HDBSCAN's min_cluster_size. See above.
             n_gram_range=(1, 3),
             top_n_words=10,
             calculate_probabilities=True,
