@@ -198,7 +198,7 @@ class TopicModeler:
             stop_words="english",  # remove common English stop words
             ngram_range=(1, 3),  # include uni/bi/trigrams
             min_df=1,  # include terms that appear in at least 1 document
-            max_df=1.0,  # include terms that appear in at most 100% of documents (i.e. no max_df filtering)
+            max_df=1.0,  # include terms that appear in at most all documents (no max_df filtering)
         )
         keybert_model = KeyBERTInspired(
             top_n_words=10,  # final words kept per topic
