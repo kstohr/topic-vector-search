@@ -1,7 +1,80 @@
 # Troubleshooting
 
 
-## Setup Issues
+## Setup Alternative: Github Codespace 
+
+Time: ~10-15 minutes.
+
+1. Setup Github Codespace
+Direct link: https://github.com/codespaces/new?repo=kstohr/topic-vector-search&ref=main -> Create codespace
+OR 
+Navigate to https://github.com/kstohr/topic-vector-search. Click Code (pulldown)
+-> codespaces -> "Create codespace on main"
+
+"Building the Codespace" will take ~ 10 minutes. Most of that time is setting up
+the dev containers. Once the containers are setup, Codespace will sync uv
+package dependencies. 
+
+1. Test uv is installed and packages are synced. 
+
+```
+ uv pip list
+```
+
+If they are not installed, try: 
+
+```
+pip install uv
+uv sync
+```
+
+2. Optional: Run `docker compose up -d`
+This will download the images and start the Elasticsearch and Ollama containers. 
+Note: This will consume more hours on your free tier. This is optional. 
+
+Check the "Ports" tab. You should see two ports running: 
+`9201` Elasticsearch 
+`11434` Ollama
+
+To confirm, run: 
+
+```
+curl localhost:920
+``` 
+You should see json output that concludes with ""tagline" : "You Know, for
+Search"
+
+```
+curl localhost:11434
+```
+You see the output "Ollama is running"
+
+3. Start the Demo App
+
+```
+uv run streamlit run app.py
+```
+Note: Codespace will forward the port. So, this will take about 15-30 seconds to
+start running. 
+
+4. Run the setup checks. 
+Go to [notebooks/00_setup_check.ipynb](notebooks/00_setup_check.ipynb)
+From the dropdown at the top of the notebook: 
+- Select Kernal 
+-> Install Jupyter + Python extension 
+-> Select Kernal: Python environments... 
+-> topic-vector-search (3.12.1)(Python 3.12.1) 
+
+- Run the setup checks
+
+Important: You must select the kernal "topic-vector-search (3.12.1)(Python
+3.12.1)" This ensure that we are running code in the virtual environment we
+installed with uv in the notebooks! If you have trouble running the notebook 
+
+Do not worry if Docker tests fail, the workshop can run without Elasticsearch
+and Ollama. 
+
+## Setup Issues 
 
 Common setup issues and fixes for the workshop environment.
 
@@ -153,6 +226,21 @@ docker compose up -d elasticsearch
 # Make sure your native Ollama has the model the workshop expects:
 ollama list | grep qwen2.5:3b || ollama pull qwen2.5:3b
 ```
+
+## Git Issues
+
+git pull says "divergent branches" or "non-fast-forward"
+The remote main has been rewritten since you cloned. Re-sync by stashing any local edits, hard-resetting to the remote, and popping the stash back:
+
+```
+git stash
+git fetch origin
+git reset --hard origin/main
+git stash pop
+```
+git reset --hard discards uncommitted changes, so the stash steps matter if
+you've started coding an exercise. If nothing local is worth keeping,
+deleting the folder and re-cloning works too.
 
 ## Pytest 
 

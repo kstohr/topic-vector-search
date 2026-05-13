@@ -31,9 +31,31 @@ in real-time applications.
 
 ## Workshop Quick Start
 
-**Do this before the workshop** — items #1 and #2 requires at least ~15 GB download and can be very slow on conference Wi-Fi with many users.
+**Do this before the workshop** — items #1 and #2 requires at least ~15 GB
+download and can be very slow on conference Wi-Fi with many users.
+
+Alternately: Use Github Codespace. Instructions are here: 
+
+[TROUBLESHOOTING.md "Setup Alternative: Github Codespace"](TROUBLESHOOTING.md#setup-alternative-github-codespace)
 
 ### 1. Install dependencies (~6 GB)
+
+`uv` is the package manager this repo uses.
+
+Mac and Linux:
+```
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+Windows (PowerShell):
+```
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+Verify:
+```
+uv --version
+```
 
 ```bash
 uv sync
