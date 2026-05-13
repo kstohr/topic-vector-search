@@ -169,6 +169,12 @@ arise.
 
 [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 
+If you get stuck, to reset your workspace (remove `/output`, stored documents, etc.): 
+
+```
+`uv run python -m reset`
+```
+
 ### Known Issues
 
 **`Exception ignored in: ResourceTracker.__del__`** — you may see this message
