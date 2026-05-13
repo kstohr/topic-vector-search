@@ -13,7 +13,7 @@ Duration 3 hours
 | 3 | Lexical Search vs. Semantic Search | 10 min | [Notebook 1](notebooks/01_lexical_vs_semantic_search.ipynb) + [Demo App](http://localhost:8501/) (Don't forget to start the app!) |
 | 4 | Understanding Embeddings | 25 min | [Notebook 2](notebooks/02_embeddings.ipynb) + Exercise 2: [preprocess_text](src/data_models.py#L69) + Exercise 3: [generate_embeddings](src/preprocess.py#L130) |
 | 5 | Topic Modeling with BERTopic | 25 min | [Notebook 3](notebooks/03_topic_modeling.ipynb) + Exercise 3: [train_topic_model](src/topic_model.py#L108) |
-| Break | Coffee break  | 20 min | 3pm |
+| Break | Coffee break  | 30 min | 3pm |
 | 6 | Evaluating Topic Search Retrieval | 20 min | [Notebook 4](notebooks/04_search_evaluation.ipynb) + Exercise 4: [compute_precision_at_k](src/evaluation.py#L59), [compute_recall_at_k](src/evaluation.py#L83), [compute_random_baseline](src/evaluation.py#L101), [preprocess_text](src/data_models.py#L63) |
 | 7 | Noise | 20 min | [Notebook 5](notebooks/05_noise.ipynb), add noise + survey  + [challenge exercise](solutions/challenge.py)| 
 | 8 | Including Images in Topic Search Retrieval (bonus) | 10 min | [Notebook 6](notebooks/06_images_bonus.ipynb) + Exercise 5: [_caption_single_post](src/preprocess.py#L98) |
