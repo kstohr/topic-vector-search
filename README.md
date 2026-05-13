@@ -162,12 +162,26 @@ OPENAI_PROJECT="proj_..."       # enterprise/team only
 
 ---
 
-## Known Issues
+# Troubleshooting 
+
+We have created a troubleshooting file to help handle common issues that may
+arise. 
+
+[TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+
+### Known Issues
 
 **`Exception ignored in: ResourceTracker.__del__`** — you may see this message
 in the terminal after running `uv run python -m src.topic_model`. It is a
 [known bug](https://github.com/uqfoundation/multiprocess/issues) in
 `multiprocess` It can be ignored.
+
+# Teardown 
+
+If you do not want to keep the workshop requirements installed, follow
+these instructions. 
+
+[TEARDOWN.md](TEARDOWN.md)
 
 ---
 
