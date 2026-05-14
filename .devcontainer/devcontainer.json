@@ -1,13 +1,12 @@
 {
   "image": "mcr.microsoft.com/devcontainers/universal:2",
-  "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
-  },
   "hostRequirements": {
     "cpus": 4,
     "memory": "16gb",
     "storage": "64gb"
   },
-  "postCreateCommand": "curl -LsSf https://astral.sh/uv/install.sh | sh",
-  "postStartCommand": "uv sync"
+  "remoteEnv": {
+    "UV_LINK_MODE": "copy"
+  },
+  "postCreateCommand": "pip install uv && uv sync"
 }
