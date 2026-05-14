@@ -495,6 +495,31 @@ steps below to troubleshoot.
    WARNING  No LLM available — topic labels will use KeyBERT keywords only.
    ```
 
+### "model 'qwen2.5:3b' not found"
+
+If you get an error like this, it means the model has not been pulled or is not
+available locally: 
+
+Try pulling it again: 
+
+```
+ollama pull qwen2.5:3b
+```
+
+```
+---------------------------------------------------------------------------
+NotFoundError                             Traceback (most recent call last)
+...
+File ~/dev/pycon_2026/topic-vector-search/.venv/lib/python3.12/site-packages/openai/_base_client.py:1087, in SyncAPIClient.request(self, cast_to, options, stream, stream_cls)
+   1084             err.response.read()
+   1086         log.debug("Re-raising status error")
+-> 1087         raise self._make_status_error_from_response(err.response) from None
+   1089     break
+   1091 assert response is not None, "could not resolve response (should never happen)"
+
+NotFoundError: Error code: 404 - {'error': {'message': "model 'qwen2.5:3b' not found", 'type': 'not_found_error', 'param': None, 'code': None}}
+```
+
 
 ## Deleting documents 
 
