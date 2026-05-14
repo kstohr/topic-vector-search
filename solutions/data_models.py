@@ -6,6 +6,7 @@ Pydantic models for raw posts (Post) and processed post documents
 (PostDocument).
 """
 
+import re
 from datetime import UTC, datetime
 
 import emoji
@@ -40,6 +41,7 @@ class Post(BaseModel):
         return dt.isoformat()
 
 
+# Inherits from Post, so all fields of Post are also fields of PostDocument
 class PostDocument(Post):
     """
     Structured post document. Inherits all fields from Post, with additional fields
@@ -47,9 +49,9 @@ class PostDocument(Post):
     - Deconstructs unstructured text and elements of the raw post into structured fields.
     - Methods to preprocess text
         - emoji conversion
-        - lowercasing,
-        - punctuation stripping
-        - remove extra whitespace
+        - handling urls, links
+        - removing @mentions
+        - etc. depending on the use case
     Note: These methods may vary based on the documents being processed and the
     downstream modeling task.
     """
@@ -69,7 +71,12 @@ class PostDocument(Post):
         ### EXERCISE SOLUTION ###
         if text is None:
             text = self.post_text
+        # Remove URLs
+        text = re.sub(r"(?:https?://|www\.)\S+", "", text)
+        # Convert emojis to text
         text = emoji.demojize(text).replace("_", " ")
+        # Collapse repeated whitespace introduced by text processing.
+        text = re.sub(r"\s+", " ", text)
         return text.strip()
 
     ##############################

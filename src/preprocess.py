@@ -183,6 +183,8 @@ class PreprocessingPipeline:
         #    embedding)
         # You can run `uv run pytest -k TestGenerateEmbeddings`
         # to test your implementation.
+        # When you've completed the implementation, run `uv run python -m
+        # src.preprocess` to run the full pipeline.
 
         if not all(postdoc.doc_embedding is not None for postdoc in postdocs):
             logger.warning("No embeddings generated — check your implementation.")
