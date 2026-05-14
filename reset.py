@@ -14,7 +14,8 @@ import logging
 import shutil
 import subprocess
 
-from elasticsearch import ConnectionError as ESConnectionError, ConnectionTimeout
+from elasticsearch import ConnectionError as ESConnectionError
+from elasticsearch import ConnectionTimeout
 
 from src.config import ELASTICSEARCH_URL, OUTPUT
 from src.es_index import delete_index, get_es_client
@@ -46,9 +47,7 @@ def reset_elasticsearch() -> None:
             f"The container may still be starting — retry in a few seconds."
         )
     except Exception as e:
-        logger.warning(
-            f"Elasticsearch index deletion skipped — {type(e).__name__}: {e}"
-        )
+        logger.warning(f"Elasticsearch index deletion skipped — {type(e).__name__}: {e}")
 
 
 def reset_output() -> None:
