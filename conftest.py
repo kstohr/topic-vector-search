@@ -18,6 +18,7 @@ import sys
 # Exercise modules that have a solutions/ counterpart.
 _EXERCISE_MODULES = [
     "ai_labeler",
+    "data_models",
     "evaluation",
     "preprocess",
     "run_pipeline",
