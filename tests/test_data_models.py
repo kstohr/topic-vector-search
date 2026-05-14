@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from src.data_models import PostDocument
 
 BASE = {
@@ -33,6 +35,7 @@ class TestPostDocumentDefaults:
         assert post.created_at.utcoffset().total_seconds() == 0
 
 
+@pytest.mark.exercise
 class TestPreprocessText:
     def test_excludes_urls(self) -> None:
         post = make_post(post_text="Check https://example.com now!")
