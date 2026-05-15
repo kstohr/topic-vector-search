@@ -71,7 +71,7 @@ class PostDocument(Post):
         ### EXERCISE ###
         # Add or remove preprocessing steps to clean text
         # At a minimum, remove URLs and convert emojis to text. You can add more steps as needed.
-        # Run `uv run pytest tests/test_models.py -k PreprocessText`
+        # Run `uv run pytest tests/test_data_models.py -k PreprocessText`
         # When you've completed, the implementation, return to the notebook to
         # generate an embedding for the post.
         if text is None:
