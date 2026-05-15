@@ -38,8 +38,8 @@ def pipeline(use_input: Path = INPUT_FILEPATH, use_output: Path = OUTPUT_FILEPAT
 
 if __name__ == "__main__":
     NOISE_INPUT: Path = NOISE_FILEPATH
-    pipeline()
+    # pipeline()
 
     # --- SWITCH TO NOISE FILEPATH TO ADD RANDOM POSTS TO THE MIX ---
 
-    # pipeline(use_input=NOISE_INPUT)
+    pipeline(use_input=NOISE_INPUT)
